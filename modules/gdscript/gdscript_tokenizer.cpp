@@ -121,6 +121,7 @@ static const char *token_names[] = {
 	"struct", // STRUCT,
 	"super", // SUPER,
 	"trait", // TRAIT,
+	"uses", // USES,
 	"var", // VAR,
 	"void", // TK_VOID,
 	"yield", // YIELD,
@@ -253,6 +254,7 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case STRUCT:
 		case SUPER:
 		case TRAIT:
+		case USES:
 		case UNDERSCORE:
 		case VAR:
 		case TK_VOID:
@@ -499,6 +501,56 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD_GROUP('c') \
 	KEYWORD("class", Token::CLASS) \
 	KEYWORD("class_name", Token::CLASS_NAME) \
+	KEYWORD("const", Token::TK_CONST)        \
+	KEYWORD("continue", Token::CONTINUE)     \
+	KEYWORD_GROUP('e')                       \
+	KEYWORD("elif", Token::ELIF)             \
+	KEYWORD("else", Token::ELSE)             \
+	KEYWORD("enum", Token::ENUM)             \
+	KEYWORD("extends", Token::EXTENDS)       \
+	KEYWORD_GROUP('f')                       \
+	KEYWORD("for", Token::FOR)               \
+	KEYWORD("func", Token::FUNC)             \
+	KEYWORD_GROUP('i')                       \
+	KEYWORD("if", Token::IF)                 \
+	KEYWORD("in", Token::TK_IN)              \
+	KEYWORD("is", Token::IS)                 \
+	KEYWORD_GROUP('m')                       \
+	KEYWORD("match", Token::MATCH)           \
+	KEYWORD_GROUP('n')                       \
+	KEYWORD("namespace", Token::NAMESPACE)   \
+	KEYWORD("not", Token::NOT)               \
+	KEYWORD_GROUP('o')                       \
+	KEYWORD("or", Token::OR)                 \
+	KEYWORD_GROUP('p')                       \
+	KEYWORD("pass", Token::PASS)             \
+	KEYWORD("preload", Token::PRELOAD)       \
+	KEYWORD_GROUP('r')                       \
+	KEYWORD("return", Token::RETURN)         \
+	KEYWORD_GROUP('s')                       \
+	KEYWORD("self", Token::SELF)             \
+	KEYWORD("signal", Token::SIGNAL)         \
+	KEYWORD("static", Token::STATIC)         \
+	KEYWORD("super", Token::SUPER)           \
+	KEYWORD_GROUP('t')                       \
+	KEYWORD("trait", Token::TRAIT)           \
+	KEYWORD_GROUP('u')                       \
+	KEYWORD("uses", Token::USES)             \
+	KEYWORD_GROUP('v')                       \
+	KEYWORD("var", Token::VAR)               \
+	KEYWORD("void", Token::TK_VOID)          \
+	KEYWORD_GROUP('w')                       \
+	KEYWORD("while", Token::WHILE)           \
+	KEYWORD("when", Token::WHEN)             \
+	KEYWORD_GROUP('y')                       \
+	KEYWORD("yield", Token::YIELD)           \
+	KEYWORD_GROUP('I')                       \
+	KEYWORD("INF", Token::CONST_INF)         \
+	KEYWORD_GROUP('N')                       \
+	KEYWORD("NAN", Token::CONST_NAN)         \
+	KEYWORD_GROUP('P')                       \
+	KEYWORD("PI", Token::CONST_PI)           \
+	KEYWORD_GROUP('T')                       \
 	KEYWORD("const", Token::TK_CONST) \
 	KEYWORD("continue", Token::CONTINUE) \
 	KEYWORD_GROUP('e') \
