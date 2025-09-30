@@ -629,6 +629,7 @@ void GDScriptParser::synchronize() {
 			case GDScriptTokenizer::Token::FUNC:
 			case GDScriptTokenizer::Token::STATIC:
 			case GDScriptTokenizer::Token::VAR:
+			case GDScriptTokenizer::Token::LET:
 			case GDScriptTokenizer::Token::TK_CONST:
 			case GDScriptTokenizer::Token::SIGNAL:
 			//case GDScriptTokenizer::Token::IF: // Can also be inside expressions.
@@ -1351,6 +1352,12 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					current_class->has_static_data = true;
 				}
 				break;
+			case GDScriptTokenizer::Token::LET:
+				parse_class_member(&GDScriptParser::parse_immutable_variable, AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				if (next_is_static) {
+					current_class->has_static_data = true;
+				}
+				break;
 			case GDScriptTokenizer::Token::TK_CONST:
 				parse_class_member(&GDScriptParser::parse_constant, AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_private);
 				break;
@@ -1384,8 +1391,8 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 			case GDScriptTokenizer::Token::STATIC: {
 				advance();
 				next_is_static = true;
-				if (!check(GDScriptTokenizer::Token::FUNC) && !check(GDScriptTokenizer::Token::VAR)) {
-					push_error(R"(Expected "func" or "var" after "static".)");
+				if (!check(GDScriptTokenizer::Token::FUNC) && !check(GDScriptTokenizer::Token::VAR) && !check(GDScriptTokenizer::Token::LET)) {
+					push_error(R"(Expected "func", "var", or "let" after "static".)");
 				}
 			} break;
 			case GDScriptTokenizer::Token::ANNOTATION: {
@@ -1472,15 +1479,23 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 }
 
 GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_private) {
-	return parse_variable(p_is_static, p_is_private, true);
+	return parse_variable(p_is_static, p_is_private, true, false);
+}
+
+GDScriptParser::VariableNode *GDScriptParser::parse_immutable_variable(bool p_is_static, bool p_is_private) {
+	return parse_variable(p_is_static, p_is_private, false, true);
 }
 
 GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_private, bool p_allow_property) {
+	return parse_variable(p_is_static, p_is_private, p_allow_property, false);
+}
+
+GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_private, bool p_allow_property, bool p_is_immutable) {
 	VariableNode *variable = alloc_node<VariableNode>();
 
 	make_completion_context(COMPLETION_DECLARATION, variable);
 
-	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected variable name after "var".)")) {
+	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, vformat(R"(Expected variable name after "%s".)", p_is_immutable ? "let" : "var"))) {
 		complete_extents(variable);
 		return nullptr;
 	}
@@ -1489,6 +1504,7 @@ GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, b
 	variable->export_info.name = variable->identifier->name;
 	variable->is_static = p_is_static;
 	variable->is_private = p_is_private;
+	variable->is_immutable = p_is_immutable;
 
 	if (match(GDScriptTokenizer::Token::COLON)) {
 		if (check(GDScriptTokenizer::Token::NEWLINE)) {
@@ -1526,6 +1542,8 @@ GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, b
 			push_error(R"(Expected expression for variable initial value after "=".)");
 		}
 		variable->assignments++;
+	} else if (p_is_immutable) {
+		push_error(R"(Expected "=" after immutable "let" declaration. Immutable variable must have an initial value.)");
 	}
 
 	if (p_allow_property && match(GDScriptTokenizer::Token::COLON)) {
@@ -1987,10 +2005,21 @@ bool GDScriptParser::parse_function_signature(FunctionNode *p_function, SuiteNod
 				is_rest = true;
 			}
 
+			bool is_immutable = false;
+			if (match(GDScriptTokenizer::Token::LET)) {
+				if (is_rest) {
+					push_error("The rest parameter cannot be immutable.");
+					continue;
+				}
+				is_immutable = true;
+			}
+
 			ParameterNode *parameter = parse_parameter();
 			if (parameter == nullptr) {
 				break;
 			}
+
+			parameter->is_immutable = is_immutable;
 
 			if (p_function->is_vararg()) {
 				push_error("Cannot have parameters after the rest parameter.");
@@ -2368,6 +2397,12 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 					result = parse_variable(false, is_private, false);
 					break;
 
+					case GDScriptTokenizer::Token::LET:
+						advance();
+						// Local immutable declaration: not static, private/public applies similarly to var.
+						result = parse_immutable_variable(false, is_private);
+						break;
+
 				case GDScriptTokenizer::Token::TK_CONST:
 					advance();
 					// Local constant: not static, private depends on modifier.
@@ -2375,7 +2410,7 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 					break;
 
 				default:
-					push_error(vformat(R"(Expected "var" or "const" after "%s".)", modifier_name));
+						push_error(vformat(R"(Expected "var", "let", or "const" after "%s".)", modifier_name));
 					synchronize();
 					break;
 			}
@@ -2383,6 +2418,10 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 		case GDScriptTokenizer::Token::VAR:
 			advance();
 			result = parse_variable(false, false, false);
+			break;
+		case GDScriptTokenizer::Token::LET:
+			advance();
+			result = parse_immutable_variable(false, false);
 			break;
 		case GDScriptTokenizer::Token::TK_CONST:
 			advance();
@@ -4649,6 +4688,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ &GDScriptParser::parse_lambda,                    nullptr,                                        PREC_NONE }, // FUNC,
 		{ nullptr,                                          &GDScriptParser::parse_binary_operator,      	PREC_CONTENT_TEST }, // TK_IN,
 		{ nullptr,                                          &GDScriptParser::parse_type_test,            	PREC_TYPE_TEST }, // IS,
+		{ nullptr,                                          nullptr,                                        PREC_NONE }, // LET,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // NAMESPACE,
 		{ &GDScriptParser::parse_preload,					nullptr,                                        PREC_NONE }, // PRELOAD,
 		{ &GDScriptParser::parse_self,                   	nullptr,                                        PREC_NONE }, // SELF,
