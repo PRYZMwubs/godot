@@ -733,6 +733,30 @@ namespace Godot.SourceGenerators
                 }
             }
 
+            if (variantType == VariantType.Object && exportAttr != null)
+            {
+                var constructorArguments = exportAttr.ConstructorArguments;
+                if (constructorArguments.Length > 0)
+                {
+                    var presetHintValue = constructorArguments[0].Value;
+                    PropertyHint presetHint = presetHintValue switch
+                    {
+                        null => PropertyHint.None,
+                        int intValue => (PropertyHint)intValue,
+                        _ => (PropertyHint)(long)presetHintValue
+                    };
+
+                    if (presetHint == PropertyHint.NodeType)
+                    {
+                        hint = PropertyHint.NodeType;
+                        hintString = constructorArguments.Length > 1
+                            ? exportAttr.ConstructorArguments[1].Value?.ToString()
+                            : null;
+                        return true;
+                    }
+                }
+            }
+
             static bool TryGetNodeOrResourceType(AttributeData exportAttr, out PropertyHint hint, out string? hintString)
             {
                 hint = PropertyHint.None;
