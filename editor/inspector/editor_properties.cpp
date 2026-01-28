@@ -4093,8 +4093,7 @@ EditorProperty *EditorInspectorDefaultPlugin::get_editor_for_property(Object *p_
 				Vector<StringName> sn = Variant(types);
 				editor->setup(sn, false, true);
 				return editor;
-			}
-			else {
+			} else {
 				EditorPropertyNodePath *editor = memnew(EditorPropertyNodePath);
         		editor->setup(Vector<StringName>(), false, false);
 				return editor;
