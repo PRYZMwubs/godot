@@ -4095,6 +4095,7 @@ EditorProperty *EditorInspectorDefaultPlugin::get_editor_for_property(Object *p_
 				return editor;
 			} else {
 				EditorPropertyNodePath *editor = memnew(EditorPropertyNodePath);
+				
         			editor->setup(Vector<StringName>(), false, false);
 				return editor;
 			}
