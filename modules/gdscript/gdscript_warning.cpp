@@ -173,6 +173,9 @@ String GDScriptWarning::get_message() const {
 			return R"("@onready" will set the default value after "@export" takes effect and will override it.)";
 		case UNUSED_STATIC_OVERRIDING_TRAIT:
 			return R"(Overridden static without using "static" keyword.)";
+		case IMPLICIT_FUNCTION_OVERRIDE:
+			CHECK_SYMBOLS(2);
+			return vformat(R"*(The method "%s()" overrides "%s.%s()" but does not have the "@override" annotation.)*", symbols[0], symbols[1], symbols[0]);
 #ifndef DISABLE_DEPRECATED
 		// Never produced. These warnings migrated from 3.x by mistake.
 		case PROPERTY_USED_AS_FUNCTION: // There is already an error.
@@ -252,6 +255,7 @@ String GDScriptWarning::get_name_from_code(Code p_code) {
 		PNAME("GET_NODE_DEFAULT_WITHOUT_ONREADY"),
 		PNAME("ONREADY_WITH_EXPORT"),
 		PNAME("UNUSED_STATIC_OVERRIDING_TRAIT"),
+		PNAME("IMPLICIT_FUNCTION_OVERRIDE"),
 #ifndef DISABLE_DEPRECATED
 		"PROPERTY_USED_AS_FUNCTION",
 		"CONSTANT_USED_AS_FUNCTION",
