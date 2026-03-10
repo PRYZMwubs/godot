@@ -2658,6 +2658,7 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		"public",
 		"signal",
 		"static",
+		"struct",
 		"trait", // Reserved for potential future use.
 		"var",
 		// Other keywords.
