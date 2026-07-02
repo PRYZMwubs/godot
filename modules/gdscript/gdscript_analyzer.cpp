@@ -52,44 +52,78 @@
 #define UNNAMED_ENUM "<anonymous enum>"
 #define ENUM_SEPARATOR "."
 
-	type.is_constant = true;
-		}
-		if (!result.class_type->resolved_uses && !result.class_type->resolving_uses) {
-			push_error("Could not resolve uses from extending class.", p_class);
-		}
-		for (String trait_fqtn : result.class_type->traits_fqtn) {
-			if (!p_class->traits_fqtn.has(trait_fqtn)) {
-				p_class->traits_fqtn.append(trait_fqtn);
-			}
+static MethodInfo info_from_utility_func(const StringName &p_function) {
+	ERR_FAIL_COND_V(!Variant::has_utility_function(p_function), MethodInfo());
+
+	MethodInfo info(p_function);
+
+	if (Variant::has_utility_function_return_value(p_function)) {
+		info.return_val.type = Variant::get_utility_function_return_type(p_function);
+		if (info.return_val.type == Variant::NIL) {
+			info.return_val.usage |= PROPERTY_USAGE_NIL_IS_VARIANT;
 		}
 	}
 
-	return OK;
+	if (Variant::is_utility_function_vararg(p_function)) {
+		info.flags |= METHOD_FLAG_VARARG;
+	} else {
+		for (int i = 0; i < Variant::get_utility_function_argument_count(p_function); i++) {
+			PropertyInfo pi;
+#ifdef DEBUG_ENABLED
+			pi.name = Variant::get_utility_function_argument_name(p_function, i);
+#else
+			pi.name = "arg" + itos(i + 1);
+#endif // DEBUG_ENABLED
+			pi.type = Variant::get_utility_function_argument_type(p_function, i);
+			info.arguments.push_back(pi);
+		}
+	}
+
+	return info;
 }
 
-Error GDScriptAnalyzer::resolve_class_inheritance(GDScriptParser::ClassNode *p_class, bool p_recursive) {
-	Error err = resolve_class_inheritance(p_class);
-	if (err) {
-		return err;
-	}
+static GDScriptParser::DataType make_callable_type(const MethodInfo &p_info) {
+	GDScriptParser::DataType type;
+	type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
+	type.kind = GDScriptParser::DataType::BUILTIN;
+	type.builtin_type = Variant::CALLABLE;
+	type.is_constant = true;
+	type.method_info = p_info;
+	return type;
+}
 
-	if (p_recursive) {
-		for (int i = 0; i < p_class->members.size(); i++) {
-			switch (p_class->members[i].type) {
-				case GDScriptParser::ClassNode::Member::TRAIT:
-				case GDScriptParser::ClassNode::Member::CLASS: {
-					const Error inner_err = resolve_class_inheritance(p_class->members[i].m_class, true);
-					if (inner_err != OK && err == OK) {
-						err = inner_err;
-					}
-				} break;
-				default:
-					break;
-			}
-		}
-	}
+static GDScriptParser::DataType make_signal_type(const MethodInfo &p_info) {
+	GDScriptParser::DataType type;
+	type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
+	type.kind = GDScriptParser::DataType::BUILTIN;
+	type.builtin_type = Variant::SIGNAL;
+	type.is_constant = true;
+	type.method_info = p_info;
+	return type;
+}
 
-	return err;
+static GDScriptParser::DataType make_native_meta_type(const StringName &p_class_name) {
+	GDScriptParser::DataType type;
+	type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
+	type.kind = GDScriptParser::DataType::NATIVE;
+	type.builtin_type = Variant::OBJECT;
+	type.native_type = p_class_name;
+	type.is_constant = true;
+	type.is_meta_type = true;
+	return type;
+}
+
+static GDScriptParser::DataType make_script_meta_type(const Ref<Script> &p_script) {
+	GDScriptParser::DataType type;
+	type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
+	type.kind = GDScriptParser::DataType::SCRIPT;
+	type.builtin_type = Variant::OBJECT;
+	type.native_type = p_script->get_instance_base_type();
+	type.script_type = p_script;
+	type.script_path = p_script->get_path();
+	type.is_constant = true;
+	type.is_meta_type = true;
+	return type;
 }
 
 // In enum types, native_type is used to store the class (native or otherwise) that the enum belongs to.
