@@ -89,6 +89,7 @@ public:
 	struct ReturnNode;
 	struct SelfNode;
 	struct SignalNode;
+	struct StructNode;
 	struct SubscriptNode;
 	struct SuiteNode;
 	struct TernaryOpNode;
@@ -108,6 +109,7 @@ public:
 			SCRIPT,
 			CLASS, // GDScript.
 			ENUM, // Enumeration.
+			STRUCT,
 			VARIANT, // Can be any type.
 			RESOLVING, // Currently resolving.
 			UNRESOLVED,
@@ -134,6 +136,7 @@ public:
 		Ref<Script> script_type;
 		String script_path;
 		ClassNode *class_type = nullptr;
+		StructNode *struct_type = nullptr;
 
 		MethodInfo method_info; // For callable/signals.
 		HashMap<StringName, int64_t> enum_values; // For enums.
@@ -220,6 +223,8 @@ public:
 					return script_type == p_other.script_type;
 				case CLASS:
 					return class_type == p_other.class_type || class_type->fqcn == p_other.class_type->fqcn;
+				case STRUCT:
+					return struct_type == p_other.struct_type;
 				case RESOLVING:
 				case UNRESOLVED:
 					break;
@@ -246,6 +251,7 @@ public:
 			script_type = p_other.script_type;
 			script_path = p_other.script_path;
 			class_type = p_other.class_type;
+			struct_type = p_other.struct_type;
 			method_info = p_other.method_info;
 			enum_values = p_other.enum_values;
 			container_element_types = p_other.container_element_types;
@@ -331,6 +337,7 @@ public:
 			RETURN,
 			SELF,
 			SIGNAL,
+			STRUCT,
 			SUBSCRIPT,
 			SUITE,
 			TERNARY_OPERATOR,
@@ -576,6 +583,7 @@ public:
 				ENUM,
 				ENUM_VALUE, // For unnamed enums.
 				GROUP, // For member grouping.
+				STRUCT,
 			};
 
 			Type type = UNDEFINED;
@@ -588,6 +596,7 @@ public:
 				VariableNode *variable;
 				EnumNode *m_enum;
 				AnnotationNode *annotation;
+				StructNode *m_struct;
 			};
 			EnumNode::Value enum_value;
 
@@ -613,6 +622,8 @@ public:
 						return enum_value.identifier->name;
 					case GROUP:
 						return annotation->export_info.name;
+					case STRUCT:
+						return m_struct->identifier->name;
 				}
 				return "";
 			}
@@ -637,6 +648,8 @@ public:
 						return "enum value";
 					case GROUP:
 						return "group";
+					case STRUCT:
+						return "struct";
 				}
 				return "";
 			}
@@ -659,6 +672,8 @@ public:
 						return signal->start_line;
 					case GROUP:
 						return annotation->start_line;
+					case STRUCT:
+						return m_struct->start_line;
 					case UNDEFINED:
 						ERR_FAIL_V_MSG(-1, "Reaching undefined member type.");
 				}
@@ -683,6 +698,8 @@ public:
 						return signal->get_datatype();
 					case GROUP:
 						return DataType();
+					case STRUCT:
+						return m_struct->get_datatype();
 					case UNDEFINED:
 						return DataType();
 				}
@@ -707,6 +724,8 @@ public:
 						return signal;
 					case GROUP:
 						return annotation;
+					case STRUCT:
+						return m_struct;
 					case UNDEFINED:
 						return nullptr;
 				}
@@ -746,6 +765,10 @@ public:
 			Member(AnnotationNode *p_annotation) {
 				type = GROUP;
 				annotation = p_annotation;
+			}
+			Member(StructNode *p_struct) {
+				type = STRUCT;
+				m_struct = p_struct;
 			}
 		};
 
@@ -916,6 +939,7 @@ public:
 			MEMBER_FUNCTION,
 			MEMBER_SIGNAL,
 			MEMBER_CLASS,
+			MEMBER_STRUCT,
 			INHERITED_VARIABLE,
 			STATIC_VARIABLE,
 			NATIVE_CLASS,
@@ -1085,6 +1109,19 @@ public:
 		SignalNode() {
 			type = SIGNAL;
 		}
+	};
+
+	struct StructNode : public Node {
+		IdentifierNode *identifier = nullptr;
+		Vector<VariableNode *> members;
+		Variant struct_def_variant;
+#ifdef TOOLS_ENABLED
+		MemberDocData doc_data;
+#endif // TOOLS_ENABLED
+
+		StructNode() { type = STRUCT; }
+
+		bool is_private = false;
 	};
 
 	struct SubscriptNode : public ExpressionNode {
@@ -1560,6 +1597,8 @@ private:
 	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(), AnnotationInfo::TargetKind p_target, const String &p_member_kind);
 	SignalNode *parse_signal(bool p_is_static);
+	EnumNode *parse_enum(bool p_is_static);
+	StructNode *parse_struct(bool p_is_static, bool p_is_private);
 	EnumNode *parse_enum(bool p_is_static, bool p_is_private);
 	ParameterNode *parse_parameter();
 	FunctionNode *parse_function(bool p_is_static, bool p_is_private);
