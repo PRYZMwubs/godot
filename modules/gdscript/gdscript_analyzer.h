@@ -173,6 +173,13 @@ class GDScriptAnalyzer {
 	void copy_over_member_doc_data(GDScriptParser::MemberDocData &p_target_doc_data, const GDScriptParser::MemberDocData &p_source_doc_data);
 #endif
 
+	// Resolving Traits Helpers.
+	void override_member_function(GDScriptParser::FunctionNode *p_target_function, const GDScriptParser::FunctionNode *p_source_function, const String &p_trait_name);
+	void extend_class(GDScriptParser::ClassNode *p_class, const GDScriptParser::ClassNode *p_trait, const GDScriptParser::Node *p_trait_name_node, const String &p_trait_name);
+#ifdef TOOLS_ENABLED
+	void copy_over_member_doc_data(GDScriptParser::MemberDocData &p_target_doc_data, const GDScriptParser::MemberDocData &p_source_doc_data);
+#endif
+
 public:
 	Error resolve_inheritance();
 	Error resolve_interface();
