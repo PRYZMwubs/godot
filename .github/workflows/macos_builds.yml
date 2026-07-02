@@ -30,6 +30,11 @@ jobs:
             scons-flags: debug_symbols=no
             bin: ./bin/godot.macos.template_release.universal
 
+          - name: Template (target=template_debug)
+            cache-name: macos-template-debug
+            target: template_debug
+            bin: ./bin/godot.macos.template_debug.universal
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
