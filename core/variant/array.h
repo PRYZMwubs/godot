@@ -44,6 +44,7 @@ class Variant;
 
 struct ArrayPrivate;
 struct ContainerType;
+struct ContainerTypeValidate;
 
 class Array {
 	mutable ArrayPrivate *_p;
@@ -177,6 +178,8 @@ public:
 
 	void set_typed(const ContainerType &p_element_type);
 	void set_typed(uint32_t p_type, const StringName &p_class_name, const Variant &p_script);
+	void set_typed(uint32_t p_type, const StringName &p_class_name, const Variant &p_script,
+			const Vector<ContainerTypeValidate> &p_nested_types);
 
 	bool is_typed() const;
 	bool is_same_typed(const Array &p_other) const;
@@ -212,4 +215,8 @@ public:
 	Array(uint32_t p_member_count, const struct StructMember &(*p_get_member)(uint32_t), const Array &p_from);
 	Array();
 	~Array();
+
+private:
+	static ContainerTypeValidate convert_container_type(const ContainerType &container);
+	static ContainerType convert_validator_to_container(const ContainerTypeValidate &validator);
 };
