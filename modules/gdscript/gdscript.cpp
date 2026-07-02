@@ -2672,6 +2672,7 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		// Declarations.
 		"class",
 		"class_name",
+		"let",
 		"const",
 		"enum",
 		"extends",
