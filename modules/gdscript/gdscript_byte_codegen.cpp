@@ -1917,6 +1917,13 @@ void GDScriptByteCodeGenerator::write_return(const Address &p_return_value, bool
 			append(p_return_value);
 			append(script_idx);
 		} break;
+		case GDScriptDataType::GDTRAIT:
+		case GDScriptDataType::STRUCT: {
+    		// No dedicated typed-return opcode exists for these custom kinds.
+    		// Return the already-validated value directly.
+    		append_opcode(GDScriptFunction::OPCODE_RETURN);
+    		append(p_return_value);
+		} break;
 	}
 }
 
