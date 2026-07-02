@@ -5751,6 +5751,7 @@ String GDScriptParser::DataType::to_property_info_hint_string() const {
 			} else {
 				return native_type;
 			}
+		case TRAIT:
 		case CLASS:
 			if (class_type != nullptr && class_type->get_global_name() != StringName()) {
 				return class_type->get_global_name();
@@ -5759,6 +5760,11 @@ String GDScriptParser::DataType::to_property_info_hint_string() const {
 			}
 		case ENUM:
 			return String(native_type).replace("::", ".");
+		case STRUCT:
+			if (struct_type != nullptr && struct_type->identifier != nullptr) {
+				return struct_type->identifier->name;
+			}
+			return "struct";
 		case VARIANT:
 			return "Variant";
 		case RESOLVING:
