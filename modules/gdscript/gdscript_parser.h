@@ -1120,6 +1120,8 @@ public:
 #endif // TOOLS_ENABLED
 
 		StructNode() { type = STRUCT; }
+
+		bool is_private = false;
 	};
 
 	struct SubscriptNode : public ExpressionNode {
@@ -1596,7 +1598,7 @@ private:
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(), AnnotationInfo::TargetKind p_target, const String &p_member_kind);
 	SignalNode *parse_signal(bool p_is_static);
 	EnumNode *parse_enum(bool p_is_static);
-	StructNode *parse_struct(bool p_is_static);
+	StructNode *parse_struct(bool p_is_static, bool p_is_private);
 	EnumNode *parse_enum(bool p_is_static, bool p_is_private);
 	ParameterNode *parse_parameter();
 	FunctionNode *parse_function(bool p_is_static, bool p_is_private);

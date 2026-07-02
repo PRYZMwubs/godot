@@ -4438,6 +4438,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::STRUCT: {
+					if (fail_if_private_not_accessible(member.m_struct->is_private, script_class)) {
+						return;
+					}
 					p_identifier->set_datatype(member.get_datatype());
 					p_identifier->is_constant = true;
 					p_identifier->reduced_value = member.m_struct->struct_def_variant;

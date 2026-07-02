@@ -1296,7 +1296,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STRUCT:
-				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct");
+				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STATIC: {
 				advance();
@@ -1850,8 +1850,10 @@ GDScriptParser::EnumNode *GDScriptParser::parse_enum(bool p_is_static, bool p_is
 	return enum_node;
 }
 
-GDScriptParser::StructNode *GDScriptParser::parse_struct(bool p_is_static) {
+GDScriptParser::StructNode *GDScriptParser::parse_struct(bool p_is_static, bool p_is_private) {
 	StructNode *struct_node = alloc_node<StructNode>();
+
+	struct_node->is_private = p_is_private;
 
 	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected identifier for the struct name after "struct".)")) {
 		complete_extents(struct_node);
