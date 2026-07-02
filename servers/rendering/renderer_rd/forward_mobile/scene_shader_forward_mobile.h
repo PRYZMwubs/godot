@@ -254,6 +254,7 @@ public:
 		bool uses_roughness = false;
 		bool uses_normal = false;
 		bool uses_tangent = false;
+		bool writes_tangent = false;
 		bool uses_particle_trails = false;
 		bool uses_normal_map = false;
 		bool uses_bent_normal_map = false;
@@ -263,6 +264,7 @@ public:
 		bool uses_vertex = false;
 		bool uses_sss = false;
 		bool uses_transmittance = false;
+		bool uses_sheen = false;
 		bool uses_screen_texture = false;
 		bool uses_depth_texture = false;
 		bool uses_normal_texture = false;

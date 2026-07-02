@@ -326,6 +326,7 @@ struct SceneShaderData : public ShaderData {
 	bool uses_position;
 	bool uses_sss;
 	bool uses_transmittance;
+	bool uses_sheen;
 	bool uses_screen_texture;
 	bool uses_screen_texture_mipmaps;
 	bool uses_depth_texture;
@@ -337,6 +338,7 @@ struct SceneShaderData : public ShaderData {
 	bool writes_modelview_or_projection;
 	bool uses_world_coordinates;
 	bool uses_tangent;
+	bool writes_tangent;
 	bool uses_color;
 	bool uses_uv;
 	bool uses_uv2;

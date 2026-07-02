@@ -68,6 +68,7 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	uses_roughness = false;
 	uses_normal = false;
 	uses_tangent = false;
+	writes_tangent = false;
 	uses_normal_map = false;
 	uses_bent_normal_map = false;
 	wireframe = false;
@@ -150,6 +151,8 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	actions.write_flag_pointers["PROJECTION_MATRIX"] = &writes_modelview_or_projection;
 	actions.write_flag_pointers["VERTEX"] = &uses_vertex;
 	actions.write_flag_pointers["POSITION"] = &uses_position;
+	actions.write_flag_pointers["TANGENT"] = &writes_tangent;
+	actions.write_flag_pointers["BINORMAL"] = &writes_tangent;
 	actions.write_flag_pointers["Z_CLIP_SCALE"] = &uses_z_clip_scale;
 
 	actions.stencil_mode_values["read"] = Pair<int *, int>(&stencil_readi, STENCIL_FLAG_READ);
@@ -753,6 +756,9 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.renames["ROUGHNESS"] = "roughness_highp";
 		actions.renames["RIM"] = "rim";
 		actions.renames["RIM_TINT"] = "rim_tint";
+		actions.renames["SHEEN"] = "sheen";
+		actions.renames["SHEEN_ROUGHNESS"] = "sheen_roughness";
+		actions.renames["SHEEN_COLOR"] = "sheen_color";
 		actions.renames["CLEARCOAT"] = "clearcoat";
 		actions.renames["CLEARCOAT_ROUGHNESS"] = "clearcoat_roughness";
 		actions.renames["ANISOTROPY"] = "anisotropy";
@@ -810,6 +816,9 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.usage_defines["BINORMAL"] = "@TANGENT";
 		actions.usage_defines["RIM"] = "#define LIGHT_RIM_USED\n";
 		actions.usage_defines["RIM_TINT"] = "@RIM";
+		actions.usage_defines["SHEEN"] = "#define LIGHT_SHEEN_USED\n";
+		actions.usage_defines["SHEEN_ROUGHNESS"] = "@SHEEN";
+		actions.usage_defines["SHEEN_COLOR"] = "@SHEEN";
 		actions.usage_defines["CLEARCOAT"] = "#define LIGHT_CLEARCOAT_USED\n";
 		actions.usage_defines["CLEARCOAT_ROUGHNESS"] = "@CLEARCOAT";
 		actions.usage_defines["ANISOTROPY"] = "#define LIGHT_ANISOTROPY_USED\n";
