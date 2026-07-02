@@ -71,6 +71,7 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 	bool in_var_const_declaration = false;
 	bool is_after_var_const_declaration = false;
 	bool expect_type = false;
+	bool expect_trait_name = false;
 
 	int in_declaration_params = 0; // The number of opened `(` after func/signal name.
 	int in_declaration_param_dicts = 0; // The number of opened `{` inside func params.
@@ -476,6 +477,13 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 				col = class_names[word];
 			} else if (reserved_keywords.has(word)) {
 				col = reserved_keywords[word];
+				if (word == GDScriptTokenizer::get_token_name(GDScriptTokenizer::Token::TRAIT) || word == GDScriptTokenizer::get_token_name(GDScriptTokenizer::Token::USES)) {
+					expect_trait_name = true;
+    				in_type_params = 0;
+				} else {
+					expect_trait_name = false;
+				}
+
 				// Don't highlight `list` as a type in `for elem: Type in list`.
 				expect_type = false;
 			} else if (member_keywords.has(word)) {
@@ -694,6 +702,9 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 		} else if (is_a_symbol) {
 			next_type = SYMBOL;
 			color = symbol_color;
+		} else if (expect_trait_name) {
+			next_type = IDENTIFIER;
+			color = member_variable_color;
 		} else if (expect_type) {
 			next_type = TYPE;
 			color = type_color;

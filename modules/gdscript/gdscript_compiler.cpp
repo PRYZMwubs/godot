@@ -3087,7 +3087,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 	// Populate inner classes.
 	for (int i = 0; i < p_class->members.size(); i++) {
 		const GDScriptParser::ClassNode::Member &member = p_class->members[i];
-		if (member.type != member.CLASS) {
+		if (member.type != member.CLASS && member.type != member.TRAIT) {
 			continue;
 		}
 		const GDScriptParser::ClassNode *inner_class = member.m_class;
@@ -3236,7 +3236,8 @@ void GDScriptCompiler::make_scripts(GDScript *p_script, const GDScriptParser::Cl
 	p_script->subclasses.clear();
 
 	for (int i = 0; i < p_class->members.size(); i++) {
-		if (p_class->members[i].type != GDScriptParser::ClassNode::Member::CLASS) {
+		if (p_class->members[i].type != GDScriptParser::ClassNode::Member::CLASS &&
+				p_class->members[i].type != GDScriptParser::ClassNode::Member::TRAIT) {
 			continue;
 		}
 		const GDScriptParser::ClassNode *inner_class = p_class->members[i].m_class;
