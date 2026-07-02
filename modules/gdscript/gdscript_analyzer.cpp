@@ -675,28 +675,28 @@ Error GDScriptAnalyzer::resolve_class_inheritance(GDScriptParser::ClassNode *p_c
 }
 
 Error GDScriptAnalyzer::resolve_class_inheritance(GDScriptParser::ClassNode *p_class, bool p_recursive) {
-    Error err = resolve_class_inheritance(p_class);
-    if (err) {
-        return err;
-    }
+	Error err = resolve_class_inheritance(p_class);
+	if (err) {
+		return err;
+	}
 
-    if (p_recursive) {
-        for (int i = 0; i < p_class->members.size(); i++) {
-            switch (p_class->members[i].type) {
-                case GDScriptParser::ClassNode::Member::TRAIT:
-                case GDScriptParser::ClassNode::Member::CLASS: {
-                    const Error inner_err = resolve_class_inheritance(p_class->members[i].m_class, true);
-                    if (inner_err != OK && err == OK) {
-                        err = inner_err;
-                    }
-                } break;
-                default:
-                    break;
-            }
-        }
-    }
+	if (p_recursive) {
+		for (int i = 0; i < p_class->members.size(); i++) {
+			switch (p_class->members[i].type) {
+				case GDScriptParser::ClassNode::Member::TRAIT:
+				case GDScriptParser::ClassNode::Member::CLASS: {
+					const Error inner_err = resolve_class_inheritance(p_class->members[i].m_class, true);
+					if (inner_err != OK && err == OK) {
+						err = inner_err;
+					}
+				} break;
+				default:
+					break;
+			}
+		}
+	}
 
-    return err;
+	return err;
 }
 
 GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::TypeNode *p_type) {

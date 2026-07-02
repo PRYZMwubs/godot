@@ -479,7 +479,7 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 				col = reserved_keywords[word];
 				if (word == GDScriptTokenizer::get_token_name(GDScriptTokenizer::Token::TRAIT) || word == GDScriptTokenizer::get_token_name(GDScriptTokenizer::Token::USES)) {
 					expect_trait_name = true;
-    				in_type_params = 0;
+					in_type_params = 0;
 				} else {
 					expect_trait_name = false;
 				}

@@ -3609,10 +3609,10 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 					}
 
 					ScriptLanguage::CodeCompletionOption option(
-           				member.m_class->identifier->name,
-            			ScriptLanguage::CODE_COMPLETION_KIND_CLASS,
-            			ScriptLanguage::LOCATION_LOCAL + location_offset);
-    					options.insert(option.display, option);
+							member.m_class->identifier->name,
+							ScriptLanguage::CODE_COMPLETION_KIND_CLASS,
+							ScriptLanguage::LOCATION_LOCAL + location_offset);
+					options.insert(option.display, option);
 				}
 				location_offset += 1;
 				clss = clss->base_type.class_type;
