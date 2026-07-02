@@ -4913,6 +4913,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				} break;
 
 				case GDScriptParser::ClassNode::Member::TRAIT: {
+					if (fail_if_private_not_accessible(member.m_class->is_private, script_class)) {
+						return;
+					}
 					reduce_identifier_from_base_set_class(p_identifier, member.get_datatype());
 					p_identifier->source = GDScriptParser::IdentifierNode::MEMBER_TRAIT;
 					return;

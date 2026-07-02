@@ -1359,7 +1359,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 			case GDScriptTokenizer::Token::TRAIT: {
 				bool previous_parsing_trait = _is_trait;
 				_is_trait = true;
-				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::TRAIT, "trait");
+				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::TRAIT, "trait", false, next_is_private);
 				_is_trait = previous_parsing_trait; // covers the case of a trait inside a trait.
 			} break;
 			case GDScriptTokenizer::Token::ENUM:
