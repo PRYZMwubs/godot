@@ -559,7 +559,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("NAN", Token::CONST_NAN) \
 	KEYWORD_GROUP('P') \
 	KEYWORD("PI", Token::CONST_PI) \
-	KEYWORD_GROUP('T')                       \
+	KEYWORD_GROUP('T') \
 	KEYWORD("TAU", Token::CONST_TAU)
 
 #define MIN_KEYWORD_LENGTH 2

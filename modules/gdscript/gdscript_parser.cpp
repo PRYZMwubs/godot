@@ -2397,11 +2397,11 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 					result = parse_variable(false, is_private, false);
 					break;
 
-					case GDScriptTokenizer::Token::LET:
-						advance();
-						// Local immutable declaration: not static, private/public applies similarly to var.
-						result = parse_immutable_variable(false, is_private);
-						break;
+				case GDScriptTokenizer::Token::LET:
+					advance();
+					// Local immutable declaration: not static, private/public applies similarly to var.
+					result = parse_immutable_variable(false, is_private);
+					break;
 
 				case GDScriptTokenizer::Token::TK_CONST:
 					advance();
@@ -2410,7 +2410,7 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 					break;
 
 				default:
-						push_error(vformat(R"(Expected "var", "let", or "const" after "%s".)", modifier_name));
+					push_error(vformat(R"(Expected "var", "let", or "const" after "%s".)", modifier_name));
 					synchronize();
 					break;
 			}
