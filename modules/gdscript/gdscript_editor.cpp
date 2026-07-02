@@ -4071,8 +4071,7 @@ static Error _lookup_symbol_from_base(const GDScriptParser::DataType &p_base, co
 					case GDScriptParser::ClassNode::Member::UNDEFINED:
 					case GDScriptParser::ClassNode::Member::GROUP:
 						return ERR_BUG;
-					case GDScriptParser::ClassNode::Member::TRAIT:
-					case GDScriptParser::ClassNode::Member::GROUP: {
+					case GDScriptParser::ClassNode::Member::TRAIT: {
 						r_result.type = ScriptLanguage::LOOKUP_RESULT_CLASS;
 						r_result.class_name = name;
 					} break;

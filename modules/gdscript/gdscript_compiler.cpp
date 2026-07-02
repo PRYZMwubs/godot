@@ -371,7 +371,6 @@ GDScriptCodeGenerator::Address GDScriptCompiler::_parse_expression(CodeGen &code
 				} break;
 				case GDScriptParser::IdentifierNode::MEMBER_CONSTANT:
 				case GDScriptParser::IdentifierNode::MEMBER_TRAIT:
-				case GDScriptParser::IdentifierNode::MEMBER_CLASS: {
 				case GDScriptParser::IdentifierNode::MEMBER_CLASS:
 				case GDScriptParser::IdentifierNode::MEMBER_STRUCT: {
 					// Try class constants.

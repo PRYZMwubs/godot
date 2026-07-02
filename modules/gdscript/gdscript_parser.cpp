@@ -942,15 +942,15 @@ bool GDScriptParser::has_class(const GDScriptParser::ClassNode *p_class) const {
 	return false;
 }
 
-GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static) {
+GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static, bool p_is_private) {
 	ClassNode *n_class;
 	if (_is_trait) {
 		n_class = alloc_node<TraitNode>();
 	} else {
 		n_class = alloc_node<ClassNode>();
 	}
-GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static, bool p_is_private) {
-	ClassNode *n_class = alloc_node<ClassNode>();
+
+	(void)p_is_static;
 
 	make_completion_context(COMPLETION_DECLARATION, n_class);
 
@@ -1354,7 +1354,6 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				if (_is_trait) {
 					push_error(R"(class can not be a member of a trait.)");
 				}
-				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::CLASS, "class");
 				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::CLASS, "class", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::TRAIT: {
