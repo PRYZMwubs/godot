@@ -1945,7 +1945,7 @@ void GDScriptAnalyzer::resolve_class_uses(GDScriptParser::ClassNode *p_class, co
 					// Check if copied over from a common trait.
 					GDScriptParser::ClassNode::Member trait_member = trait->get_member(member_name);
 					bool copied_over = trait_member.get_source_node()->trait_origin.has(p_class->fqcn);
-					for (const String &trait_fqcn : p_class->traits_fqtn) {
+					for (const StringName &trait_fqcn : p_class->traits_fqtn) {
 						if (!copied_over && trait_member.get_source_node()->trait_origin.has(trait_fqcn)) {
 							copied_over = true;
 							break;
@@ -7679,7 +7679,7 @@ void GDScriptAnalyzer::extend_class(GDScriptParser::ClassNode *p_class, const GD
 			continue;
 		}
 		bool copied_over = false;
-		for (const String &trait_fqcn : p_class->traits_fqtn) {
+		for (const StringName &trait_fqcn : p_class->traits_fqtn) {
 			if (trait_member.get_source_node()->trait_origin.has(trait_fqcn)) {
 				copied_over = true;
 				break;
