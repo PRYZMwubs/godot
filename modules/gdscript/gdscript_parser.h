@@ -756,6 +756,7 @@ public:
 		bool extends_used = false;
 		bool onready_used = false;
 		bool is_abstract = false;
+		bool is_private = false;
 		bool has_static_data = false;
 		bool annotated_static_unload = false;
 		String extends_path;
@@ -817,6 +818,8 @@ public:
 		ConstantNode() {
 			type = CONSTANT;
 		}
+
+		bool is_private = false;
 	};
 
 	struct ContinueNode : public Node {
@@ -864,6 +867,7 @@ public:
 		SuiteNode *body = nullptr;
 		bool is_abstract = false;
 		bool is_static = false; // For lambdas it's determined in the analyzer.
+		bool is_private = false;
 		bool is_coroutine = false;
 		Variant rpc_config;
 		MethodInfo info;
@@ -1274,6 +1278,8 @@ public:
 		PropertyInfo export_info;
 		int assignments = 0;
 		bool is_static = false;
+
+		bool is_private = false;
 #ifdef TOOLS_ENABLED
 		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
@@ -1541,16 +1547,20 @@ private:
 
 	// Main blocks.
 	void parse_program();
-	ClassNode *parse_class(bool p_is_static);
+	ClassNode *parse_class(bool p_is_static, bool p_is_private);
 	void parse_class_name();
 	void parse_extends();
 	void parse_class_body(bool p_is_multiline);
 	template <typename T>
-	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static = false);
+	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool, bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static = false, bool p_is_private = false);
+	template <typename T>
+	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_private = false);
+	template <typename T>
+	void parse_class_member(T *(GDScriptParser::*p_parse_function)(), AnnotationInfo::TargetKind p_target, const String &p_member_kind);
 	SignalNode *parse_signal(bool p_is_static);
 	EnumNode *parse_enum(bool p_is_static);
 	ParameterNode *parse_parameter();
-	FunctionNode *parse_function(bool p_is_static);
+	FunctionNode *parse_function(bool p_is_static, bool p_is_private);
 	bool parse_function_signature(FunctionNode *p_function, SuiteNode *p_body, const String &p_type, int p_signature_start);
 	SuiteNode *parse_suite(const String &p_context, SuiteNode *p_suite = nullptr, bool p_for_lambda = false);
 	// Annotations
@@ -1575,12 +1585,12 @@ private:
 	bool rpc_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	// Statements.
 	Node *parse_statement();
-	VariableNode *parse_variable(bool p_is_static);
-	VariableNode *parse_variable(bool p_is_static, bool p_allow_property);
+	VariableNode *parse_variable(bool p_is_static, bool p_is_private);
+	VariableNode *parse_variable(bool p_is_static, bool p_is_private, bool p_allow_property);
 	VariableNode *parse_property(VariableNode *p_variable, bool p_need_indent);
 	void parse_property_getter(VariableNode *p_variable);
 	void parse_property_setter(VariableNode *p_variable);
-	ConstantNode *parse_constant(bool p_is_static);
+	ConstantNode *parse_constant(bool p_is_static, bool p_is_private);
 	AssertNode *parse_assert();
 	BreakNode *parse_break();
 	ContinueNode *parse_continue();

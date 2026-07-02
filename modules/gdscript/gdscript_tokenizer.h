@@ -128,6 +128,8 @@ public:
 			VAR,
 			TK_VOID, // Conflict with WinAPI.
 			YIELD,
+			PRIVATE,
+			PUBLIC,
 			// Punctuation
 			BRACKET_OPEN,
 			BRACKET_CLOSE,
@@ -160,7 +162,7 @@ public:
 			// Special
 			ERROR,
 			TK_EOF, // "EOF" is reserved
-			TK_MAX
+			TK_MAX,
 		};
 
 		Type type = EMPTY;
