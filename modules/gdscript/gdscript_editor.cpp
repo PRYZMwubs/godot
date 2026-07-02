@@ -3594,19 +3594,28 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 			r_forced = true;
 		} break;
 		case GDScriptParser::COMPLETION_USES_TYPE: {
-			const GDScriptParser::ClassNode *current = completion_context.current_class;
-			for (const GDScriptParser::ClassNode::Member &member : current->members) {
-				switch (member.type) {
-					case GDScriptParser::ClassNode::Member::TRAIT:
-					case GDScriptParser::ClassNode::Member::CLASS:
-						if (member.m_class && member.m_class->identifier) {
-							ScriptLanguage::CodeCompletionOption option(member.m_class->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_LOCAL);
-							options.insert(option.display, option);
-						}
-						break;
-					default:
-						break;
+			const GDScriptParser::ClassNode *clss = completion_context.current_class;
+			int location_offset = 0;
+			while (clss) {
+				for (const GDScriptParser::ClassNode::Member &member : clss->members) {
+					if (member.type != GDScriptParser::ClassNode::Member::TRAIT) {
+						continue;
+					}
+					if (!member.m_class || !member.m_class->identifier) {
+						continue;
+					}
+					if (member.m_class->is_private && !_can_access_private_for_completion(clss, completion_context.current_class)) {
+						continue;
+					}
+
+					ScriptLanguage::CodeCompletionOption option(
+           				member.m_class->identifier->name,
+            			ScriptLanguage::CODE_COMPLETION_KIND_CLASS,
+            			ScriptLanguage::LOCATION_LOCAL + location_offset);
+    					options.insert(option.display, option);
 				}
+				location_offset += 1;
+				clss = clss->base_type.class_type;
 			}
 			LocalVector<StringName> global_classes;
 			ScriptServer::get_global_class_list(global_classes);
