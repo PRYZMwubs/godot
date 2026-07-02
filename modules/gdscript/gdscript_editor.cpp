@@ -1309,7 +1309,7 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.signal->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_SIGNAL, location);
 						break;
 					case GDScriptParser::ClassNode::Member::STRUCT:
-						if (member.m_struct-> is_private && !_can_access_private_for_completion(clss, p_from_class)) {
+						if (member.m_struct->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
 						if (p_only_functions) {
