@@ -560,6 +560,8 @@ public:
 		EnumNode() {
 			type = ENUM;
 		}
+
+		bool is_private = false;
 	};
 
 	struct ClassNode : public Node {
@@ -1558,7 +1560,7 @@ private:
 	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(), AnnotationInfo::TargetKind p_target, const String &p_member_kind);
 	SignalNode *parse_signal(bool p_is_static);
-	EnumNode *parse_enum(bool p_is_static);
+	EnumNode *parse_enum(bool p_is_static, bool p_is_private);
 	ParameterNode *parse_parameter();
 	FunctionNode *parse_function(bool p_is_static, bool p_is_private);
 	bool parse_function_signature(FunctionNode *p_function, SuiteNode *p_body, const String &p_type, int p_signature_start);

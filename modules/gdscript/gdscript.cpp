@@ -2654,6 +2654,8 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		"extends",
 		"func",
 		"namespace", // Reserved for potential future use.
+		"private",
+		"public",
 		"signal",
 		"static",
 		"trait", // Reserved for potential future use.

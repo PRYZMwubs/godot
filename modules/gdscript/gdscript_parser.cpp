@@ -1267,10 +1267,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 			case GDScriptTokenizer::Token::PRIVATE: {
 				advance();
 				next_is_private = true;
-			}	break;
+			} break;
 			case GDScriptTokenizer::Token::PUBLIC: {
 				advance();
-			}	break;
+			} break;
 			case GDScriptTokenizer::Token::VAR:
 				parse_class_member(&GDScriptParser::parse_variable, AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				if (next_is_static) {
@@ -1282,21 +1282,18 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				break;
 			case GDScriptTokenizer::Token::SIGNAL:
 				if (next_is_private) {
-        			push_error(R"(The "private" keyword cannot be applied to "signal".)");
-    			}
+					push_error(R"(The "private" keyword cannot be applied to "signal".)");
+				}
 				parse_class_member(&GDScriptParser::parse_signal, AnnotationInfo::SIGNAL, "signal");
 				break;
 			case GDScriptTokenizer::Token::FUNC:
 				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::CLASS:
-				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::CLASS, "class", next_is_private);
+				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::CLASS, "class", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::ENUM:
-				if (next_is_private) {
-        			push_error(R"(The "private" keyword cannot be applied to "enum".)");
-    			}
-				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum");
+				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STATIC: {
 				advance();
@@ -1304,7 +1301,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				if (!check(GDScriptTokenizer::Token::FUNC) && !check(GDScriptTokenizer::Token::VAR)) {
 					push_error(R"(Expected "func" or "var" after "static".)");
 				}
-			} 	break;
+			} break;
 			case GDScriptTokenizer::Token::ANNOTATION: {
 				advance();
 
@@ -1749,9 +1746,10 @@ GDScriptParser::SignalNode *GDScriptParser::parse_signal(bool p_is_static) {
 	return signal;
 }
 
-GDScriptParser::EnumNode *GDScriptParser::parse_enum(bool p_is_static) {
+GDScriptParser::EnumNode *GDScriptParser::parse_enum(bool p_is_static, bool p_is_private) {
 	EnumNode *enum_node = alloc_node<EnumNode>();
 	bool named = false;
+	enum_node->is_private = p_is_private;
 
 	make_completion_context(COMPLETION_DECLARATION, enum_node);
 
@@ -2243,8 +2241,7 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 					synchronize();
 					break;
 			}
-		}
-			break;
+		} break;
 		case GDScriptTokenizer::Token::VAR:
 			advance();
 			result = parse_variable(false, false, false);
@@ -4859,7 +4856,7 @@ bool GDScriptParser::export_annotations(AnnotationNode *p_annotation, Node *p_ta
 	}
 	if (variable->is_private) {
 		push_error(vformat(R"(Annotation "%s" cannot be applied to a private variable.)", p_annotation->name), p_annotation);
-    	return false;
+		return false;
 	}
 	if (variable->exported) {
 		push_error(vformat(R"(Annotation "%s" cannot be used with another "@export" annotation.)", p_annotation->name), p_annotation);

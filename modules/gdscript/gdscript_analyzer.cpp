@@ -4236,6 +4236,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::ENUM_VALUE: {
+					if (fail_if_private_not_accessible(member.enum_value.parent_enum->is_private, script_class)) {
+						return;
+					}
 					p_identifier->set_datatype(member.get_datatype());
 					p_identifier->is_constant = true;
 					p_identifier->reduced_value = member.enum_value.value;
@@ -4244,6 +4247,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::ENUM: {
+					if (fail_if_private_not_accessible(member.m_enum->is_private, script_class)) {
+						return;
+					}
 					p_identifier->set_datatype(member.get_datatype());
 					p_identifier->is_constant = true;
 					p_identifier->reduced_value = member.m_enum->dictionary;
@@ -5933,6 +5939,15 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 	}
 	StringName function_name = p_function;
 
+	auto can_access_private_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
+		for (const GDScriptParser::ClassNode *scope = parser->current_class; scope != nullptr; scope = scope->base_type.class_type) {
+			if (scope == p_owner_class) {
+				return true; // same class or child class
+			}
+		}
+		return false;
+	};
+
 	bool was_enum = false;
 	if (p_base_type.kind == GDScriptParser::DataType::ENUM) {
 		was_enum = true;
@@ -6007,6 +6022,11 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 			}
 
 			resolve_class_member(base_class, function_name, p_source);
+			GDScriptParser::FunctionNode *candidate = base_class->get_member(function_name).function;
+			if (candidate->is_private && !can_access_private_from_current_class(base_class)) {
+				push_error(vformat(R"(Private members can't be used outside of "%s".)", base_class->fqcn), p_source);
+				return false;
+			}
 			found_function = base_class->get_member(function_name).function;
 		}
 
