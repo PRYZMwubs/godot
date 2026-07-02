@@ -58,6 +58,18 @@
 
 #ifndef _3D_DISABLED
 #include "scene/3d/camera_3d.h"
+#include "scene/3d/mesh_instance_3d.h"
+#include "scene/3d/sprite_3d.h"
+#ifndef PHYSICS_3D_DISABLED
+#include "scene/3d/physics/collision_object_3d.h"
+#include "scene/3d/physics/collision_shape_3d.h"
+#endif // PHYSICS_3D_DISABLED
+#include "modules/csg/csg_shape.h"
+#include "scene/3d/visual_instance_3d.h"
+#include "scene/resources/3d/convex_polygon_shape_3d.h"
+#include "scene/resources/material.h"
+#include "scene/resources/mesh.h"
+#include "scene/resources/surface_tool.h"
 #endif
 
 #ifdef DEBUG_ENABLED
