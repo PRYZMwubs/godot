@@ -37,7 +37,6 @@
 #include "editor/editor_string_names.h"
 #include "editor/scene/3d/node_3d_editor_plugin.h"
 #include "editor/settings/editor_settings.h"
-#include "modules/csg/csg_shape.h"
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/3d/sprite_3d.h"
 #include "scene/main/scene_tree.h"
@@ -45,6 +44,8 @@
 #include "scene/resources/material.h"
 #include "scene/resources/mesh.h"
 #include "servers/rendering/rendering_server.h"
+
+#include "modules/csg/csg_shape.h"
 
 #define HANDLE_HALF_SIZE 9.5
 
