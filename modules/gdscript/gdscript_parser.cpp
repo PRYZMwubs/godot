@@ -811,15 +811,9 @@ void GDScriptParser::parse_program() {
 				}
 				break;
 			case GDScriptTokenizer::Token::FINAL:
-				advance();
-				if (head->is_final) {
-					push_error(R"(The "final" keyword can only be used once on the script class.)");
-				} else {
-					head->is_final = true;
-				}
-				if (!check(GDScriptTokenizer::Token::CLASS_NAME) && !check(GDScriptTokenizer::Token::TRAIT_NAME) && !check(GDScriptTokenizer::Token::EXTENDS)) {
-					push_error(R"(The "final" keyword can only be used before "class_name", "trait_name", or "extends" at the script level.)");
-				}
+				// Leave `final` in the token stream for `parse_class_body()`, where it can be used
+				// before class/function declarations (including top-level nested classes).
+				can_have_class_or_extends = false;
 				break;
 			case GDScriptTokenizer::Token::USES:
 				PUSH_PENDING_ANNOTATIONS_TO_HEAD;
@@ -1433,6 +1427,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
 					next_is_override = false;
 				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword must come before the "func" or "class" keyword, after any access modifiers.)");
+					next_is_final = false;
+				}
 				advance();
 				next_is_private = true;
 			} break;
@@ -1441,14 +1439,19 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
 					next_is_override = false;
 				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword must come before the "func" or "class" keyword, after any access modifiers.)");
+					next_is_final = false;
+				}
 				advance();
+				next_is_private = false;
 			} break;
 			case GDScriptTokenizer::Token::OVERRIDE: {
 				advance();
-				next_is_override = true;
-				if (!check(GDScriptTokenizer::Token::FUNC)) {
-					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used once in a declaration.)");
 				}
+				next_is_override = true;
 			} break;
 			case GDScriptTokenizer::Token::FINAL: {
 				advance();
@@ -1456,26 +1459,55 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword can only be used once in a declaration.)");
 				}
 				next_is_final = true;
-				if (!check(GDScriptTokenizer::Token::FUNC) && !check(GDScriptTokenizer::Token::CLASS)) {
-					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
-				}
 			} break;
 			case GDScriptTokenizer::Token::VAR:
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
+					next_is_final = false;
+				}
 				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				if (next_is_static) {
 					current_class->has_static_data = true;
 				}
 				break;
 			case GDScriptTokenizer::Token::LET:
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
+					next_is_final = false;
+				}
 				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_immutable_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				if (next_is_static) {
 					current_class->has_static_data = true;
 				}
 				break;
 			case GDScriptTokenizer::Token::TK_CONST:
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
+					next_is_final = false;
+				}
 				parse_class_member(static_cast<ConstantNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_constant), AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::SIGNAL:
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
+					next_is_final = false;
+				}
 				if (next_is_private) {
 					push_error(R"(The "private" keyword cannot be applied to "signal".)");
 				}
@@ -1500,15 +1532,35 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword cannot be applied to traits.)");
 					next_is_final = false;
 				}
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
 				bool previous_parsing_trait = _is_trait;
 				_is_trait = true;
 				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::TRAIT, "trait", false, next_is_private);
 				_is_trait = previous_parsing_trait; // covers the case of a trait inside a trait.
 			} break;
 			case GDScriptTokenizer::Token::ENUM:
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
+					next_is_final = false;
+				}
 				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STRUCT:
+				if (next_is_override) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
+					next_is_final = false;
+				}
 				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STATIC: {
@@ -1554,6 +1606,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				advance();
 				end_statement(R"("pass")");
 				break;
+			case GDScriptTokenizer::Token::NEWLINE:
+				advance();
+				break;
 			case GDScriptTokenizer::Token::DEDENT:
 				class_end = true;
 				break;
@@ -1594,14 +1649,17 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				break;
 		}
-		if (token.type != GDScriptTokenizer::Token::STATIC) {
+		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_static = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::PRIVATE) {
+		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_private = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::FINAL) {
+		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_final = false;
+		}
+		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::NEWLINE) {
+			next_is_override = false;
 		}
 		if (panic_mode) {
 			synchronize();
@@ -4844,6 +4902,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // SIGNAL,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // STATIC,
 		{ nullptr,											nullptr,										PREC_NONE }, // STRUCT,
+		{ nullptr,										nullptr,										PREC_NONE }, // OVERRIDE,
 		{ &GDScriptParser::parse_call,						nullptr,                                        PREC_NONE }, // SUPER,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // TRAIT,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // TRAIT_NAME,
@@ -4853,7 +4912,6 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ &GDScriptParser::parse_yield,                     nullptr,                                      PREC_NONE }, // YIELD,
 		{ nullptr,											nullptr,										PREC_NONE }, // PRIVATE,
 		{ nullptr,											nullptr,										PREC_NONE }, // PUBLIC,
-		{ nullptr,                                          nullptr,                                        PREC_NONE }, // OVERRIDE,
 		// Punctuation
 		{ &GDScriptParser::parse_array,                  	&GDScriptParser::parse_subscript,            	PREC_SUBSCRIPT }, // BRACKET_OPEN,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // BRACKET_CLOSE,
