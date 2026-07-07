@@ -603,6 +603,9 @@
 		<member name="debug/gdscript/warnings/integer_division" type="int" setter="" getter="" default="1">
 			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when dividing an integer by another integer (the decimal part will be discarded).
 		</member>
+		<member name="debug/gdscript/warnings/missing_access_modifier" type="int" setter="" getter="" default="1">
+			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when a class variable or function does not declare an explicit access modifier such as [code]public[/code] or [code]private[/code].
+		</member>
 		<member name="debug/gdscript/warnings/missing_await" type="int" setter="" getter="" default="0">
 			When set to [b]Warn[/b] or [b]Error[/b], produces a warning or an error respectively when calling a coroutine without [code]await[/code].
 		</member>
