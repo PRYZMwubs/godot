@@ -1,5 +1,5 @@
 class TestNativeProperty extends Line2D:
-	@override
+	override
 	func _ready() -> void:
 		points = PackedVector2Array([Vector2()])
 		points[0] = Vector2.ONE # Warn.
@@ -25,7 +25,7 @@ class TestNativeProperty extends Line2D:
 class TestCustomProperty extends Node:
 	var points: PackedVector2Array
 
-	@override
+	override
 	func _ready() -> void:
 		points = PackedVector2Array([Vector2()])
 		points[0] = Vector2.ONE

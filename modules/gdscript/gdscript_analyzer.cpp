@@ -2482,7 +2482,7 @@ void GDScriptAnalyzer::resolve_function_signature(GDScriptParser::FunctionNode *
 			// Mark the function as an override if the check succeeds.
 			p_function->is_override = true;
 
-			// Then if we don't see the @override annotation, raise a warning.
+			// Then if we don't see the override keyword, raise a warning.
 			if (!p_function->is_marked_as_override) {
 				StringName base_class_name = defining_class.is_empty() ? StringName("<unknown class>") : defining_class;
 				parser->push_warning(p_function, GDScriptWarning::IMPLICIT_FUNCTION_OVERRIDE, function_name, defining_class);
@@ -2496,9 +2496,9 @@ void GDScriptAnalyzer::resolve_function_signature(GDScriptParser::FunctionNode *
 #endif // DEBUG_ENABLED
 		}
 
-		// If a function with `@override` doesn't override anything, raise an error.
+		// If a function with the override keyword doesn't override anything, raise an error.
 		if (p_function->is_marked_as_override && !p_function->is_override) {
-			push_error(vformat(R"*(The function %s() has the "@override" annotation, but does not override anything.)*", function_name), p_function);
+			push_error(vformat(R"*(The function %s() has the "override" keyword, but does not override anything.)*", function_name), p_function);
 		}
 
 #endif // TOOLS_ENABLED

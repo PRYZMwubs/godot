@@ -13,7 +13,7 @@
 		print(get_text_1())
 
 @abstract class B extends A:
-	@override
+	override
 	func get_text_1() -> String:
 		return "text_1b"
 
@@ -21,33 +21,33 @@
 		print(get_text_2())
 
 class C extends B:
-	@override
+	override
 	func get_text_2() -> String:
 		return "text_2c"
 
-	@override
+	override
 	func func_with_param(param: int) -> int: return param
-	@override
+	override
 	func func_with_rest_param(...args: Array) -> int: return args.size()
-	@override
+	override
 	func func_with_semicolon() -> int: return 0
-	@override
+	override
 	func func_1() -> int: return 0
-	@override
+	override
 	func func_2() -> int: return 0
-	@override
+	override
 	func func_without_return_type(): pass
 
 @abstract class D extends C:
-	@override
+	override
 	@abstract func get_text_1() -> String
 
-	@override
+	override
 	func get_text_2() -> String:
 		return super() + " text_2d"
 
 class E extends D:
-	@override
+	override
 	func get_text_1() -> String:
 		return "text_1e"
 

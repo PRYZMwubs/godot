@@ -1,6 +1,6 @@
 func test():
 	print("warn")
 
-@override
+override
 func get(_property: StringName) -> Variant:
 	return null

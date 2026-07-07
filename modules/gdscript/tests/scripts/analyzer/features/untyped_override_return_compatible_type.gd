@@ -9,17 +9,17 @@ class A:
 	func return_object_as_node(_object: Object) -> Node: return null
 
 class B extends A:
-	@override
+	override
 	func return_float(): return 2
-	@override
+	override
 	func return_int_as_float(x: int): return x
-	@override
+	override
 	func return_variant_as_float(x: Variant): return x
-	@override
+	override
 	func return_float_array(): return [2]
-	@override
+	override
 	func return_untyped_array_as_float_array(array: Array): return array
-	@override
+	override
 	func return_float_dict(): return {2: 2}
 	func return_untyped_dict_as_float_dict(dict: Dictionary): return dict
 	func return_object_as_node(object: Object): return object

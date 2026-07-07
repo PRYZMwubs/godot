@@ -1721,7 +1721,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 
 	static const char *_keywords_with_space[] = {
 		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "is", "func", "signal", "await",
-		"const", "enum", "static", "var", "let", "if", "elif", "else", "for", "match", "when", "while", "private", "public", "struct",
+		"const", "enum", "static", "var", "let", "if", "elif", "else", "for", "match", "when", "while", "private", "public", "override", "struct",
 		nullptr
 	};
 
@@ -3550,21 +3550,22 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 
 /**
  * Generates additional edits for GDScript completions of category `COMPLETION_OVERRIDE_METHOD`.
- * These edits will automatically apply the `@override` annotation when using completion to generate an override.
- * If the `@override` annotation is already present, nothing will occur.
+ * These edits will automatically apply the `override` keyword when using completion to generate an override.
+ * If the `override` keyword is already present, nothing will occur.
  *
  * @param ctx           The completion context
  * @param code_by_line  A vector containing each line of text in the currently open file (split by \n).
  */
 static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptParser::CompletionContext &ctx, const Vector<String> &code_by_line) {
 	int line = ctx.current_line - 1; // The ctx current line is one-indexed, but the code_by_line is zero-indexed.
-	// Backtrack in the current line and upwards a few lines to search for `@override`. If we don't see it, apply it on the line above the `func` keyword.
-	bool has_override_annotation = false;
+	// Backtrack in the current line and upwards a few lines to search for the override keyword. If we don't see it, apply it on the line above the `func` keyword.
+	bool has_override_modifier = false;
 	int lines_traversed = 0;
 	int func_line = -1; // Generally speaking we expect the line with `func` to be the current line, but for sanity we'll search for it anyway.
 
-	while (!has_override_annotation && lines_traversed < 10 && line >= 0) {
+	while (!has_override_modifier && lines_traversed < 10 && line >= 0) {
 		String text = code_by_line.get(line);
+		String stripped_text = text.strip_edges();
 
 		if (text.contains("func")) {
 			if (func_line == -1) {
@@ -3574,8 +3575,8 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 			}
 		}
 
-		if (text.contains("@override")) {
-			has_override_annotation = true;
+		if (stripped_text == "override" || stripped_text.begins_with("override ")) {
+			has_override_modifier = true;
 			break;
 		}
 
@@ -3583,18 +3584,18 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 		lines_traversed++;
 	}
 
-	if (!has_override_annotation && func_line != -1) {
+	if (!has_override_modifier && func_line != -1) {
 		String text = code_by_line.get(func_line);
 		ScriptLanguage::TextEdit edit;
 		edit.start = { func_line - 1, 0 }; // Always start at the base of the line above the func_line
 		edit.end = { func_line, 0 }; // And then end on the func line itself.
 
-		// What we actually need to do here is replace whatever the line above the func_line was with "<line>\n@override\n"
-		// But the @override has to have the same indentation level as the func_line.
+		// What we actually need to do here is replace whatever the line above the func_line was with "<line>\noverride\n"
+		// But the override keyword has to have the same indentation level as the func_line.
 
 		int func_column = text.length() - text.lstrip(" \t").length();
 		String new_text = code_by_line.get(func_line - 1);
-		new_text = new_text + "\n" + text.substr(0, func_column) + "@override\n";
+		new_text = new_text + "\n" + text.substr(0, func_column) + "override\n";
 
 		edit.new_text = new_text;
 
@@ -3915,7 +3916,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 							display_name += member.function->signature + ":";
 							ScriptLanguage::CodeCompletionOption option(display_name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
 
-							// When inserting a completion for a function override, we want to automatically add the @override annotation to the completion.
+							// When inserting a completion for a function override, we want to automatically add the override keyword to the completion.
 							option.additional_edits = get_override_text_edits(completion_context, code_by_line);
 
 							options.insert(member.function->identifier->name, option); // Insert name instead of display to track duplicates.
@@ -3993,7 +3994,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 
 				ScriptLanguage::CodeCompletionOption option(method_hint, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
 
-				// When inserting a completion for a function override, we want to automatically add the @override annotation to the completion.
+				// When inserting a completion for a function override, we want to automatically add the override keyword to the completion.
 				option.additional_edits = get_override_text_edits(completion_context, code_by_line);
 
 				options.insert(option.display, option);

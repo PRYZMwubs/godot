@@ -3,15 +3,15 @@ class BaseClass:
         pass
 
 class ChildClass extends BaseClass:
-    @override
+    override
     func base_method():
         pass
 
 class NativeMethodOverride extends Node:
-    @override
+    override
     func _physics_process(delta: float) -> void:
         pass
 
-    @override
+    override
     func doesnt_override_anything():
         pass

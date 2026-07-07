@@ -1,5 +1,5 @@
 class Check extends Node:
-	@override
+	override
 	func _set(_property: StringName, _value: Variant) -> bool:
 		return true
 

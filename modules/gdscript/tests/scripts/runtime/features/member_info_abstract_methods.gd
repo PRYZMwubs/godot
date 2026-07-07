@@ -8,19 +8,19 @@
 	@abstract func test_int() -> int
 
 class B extends A:
-	@override
+	override
 	func test_untyped_1(): pass
-	@override
+	override
 	func test_untyped_2(): return
-	@override
+	override
 	func test_untyped_3(): return null
-	@override
+	override
 	func test_untyped_4(): return 0
-	@override
+	override
 	func test_void() -> void: pass
-	@override
+	override
 	func test_variant() -> Variant: return null
-	@override
+	override
 	func test_int() -> int: return 0
 
 func test_script_method_signature(name: String, script: Script) -> void:

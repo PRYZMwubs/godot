@@ -2665,6 +2665,7 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		"for",
 		"if",
 		"match",
+		"override",
 		"pass",
 		"return",
 		"when",

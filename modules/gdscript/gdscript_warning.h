@@ -93,7 +93,7 @@ public:
 		GET_NODE_DEFAULT_WITHOUT_ONREADY, // A class variable uses `get_node()` (or the `$` notation) as its default value, but does not use the @onready annotation.
 		ONREADY_WITH_EXPORT, // The `@onready` annotation will set the value after `@export` which is likely not intended.
 		UNUSED_STATIC_OVERRIDING_TRAIT, // Overridden static without using "static" keyword.
-		IMPLICIT_FUNCTION_OVERRIDE, // A function overrides a function in a parent class, but does not have the `@override` annotation.
+		IMPLICIT_FUNCTION_OVERRIDE, // A function overrides a function in a parent class, but does not have the `override` keyword.
 #ifndef DISABLE_DEPRECATED
 		PROPERTY_USED_AS_FUNCTION, // Function not found, but there's a property with the same name.
 		CONSTANT_USED_AS_FUNCTION, // Function not found, but there's a constant with the same name.

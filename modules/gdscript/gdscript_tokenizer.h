@@ -125,6 +125,7 @@ public:
 			SIGNAL,
 			STATIC,
 			STRUCT,
+			OVERRIDE,
 			SUPER,
 			TRAIT,
 			TRAIT_NAME,

@@ -1,17 +1,17 @@
 extends InnerA
 
-@override
+override
 func test():
 	super.test()
 
 class InnerA extends InnerAB:
-	@override
+	override
 	func test():
 		print("InnerA.test")
 		super.test()
 
 	class InnerAB extends InnerB:
-		@override
+		override
 		func test():
 			print("InnerA.InnerAB.test")
 			super.test()

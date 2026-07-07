@@ -16,7 +16,7 @@ class A:
 			return hello
 
 class C extends A.B:
-	@override
+	override
 	func get_signal() -> Signal:
 		return hello
 

@@ -1,14 +1,14 @@
 # GH-118877
 
 class Test1:
-	@override
+	override
 	func _get_property_list():
 		return [
 			{ "name": "test_property", "type": TYPE_INT },
 		]
 
 class Test2:
-	@override
+	override
 	func _get_property_list():
 		var properties = []
 
@@ -17,7 +17,7 @@ class Test2:
 		return properties
 
 class Test3:
-	@override
+	override
 	func _get_property_list() -> Array[Dictionary]:
 		var properties = []
 

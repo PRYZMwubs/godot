@@ -1,5 +1,5 @@
 extends "inner_base.gd".InnerA.InnerAB
 
-@override
+override
 func test():
 	super.test()

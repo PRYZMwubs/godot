@@ -120,6 +120,7 @@ static const char *token_names[] = {
 	"signal", // SIGNAL,
 	"static", // STATIC,
 	"struct", // STRUCT,
+	"override", // OVERRIDE,
 	"super", // SUPER,
 	"trait", // TRAIT,
 	"trait_name", // TRAIT_NAME,
@@ -254,6 +255,7 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case SIGNAL:
 		case STATIC:
 		case STRUCT:
+		case OVERRIDE:
 		case SUPER:
 		case TRAIT:
 		case TRAIT_NAME:
@@ -526,6 +528,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("namespace", Token::NAMESPACE) \
 	KEYWORD("not", Token::NOT) \
 	KEYWORD_GROUP('o') \
+	KEYWORD("override", Token::OVERRIDE) \
 	KEYWORD("or", Token::OR) \
 	KEYWORD_GROUP('p') \
 	KEYWORD("pass", Token::PASS) \

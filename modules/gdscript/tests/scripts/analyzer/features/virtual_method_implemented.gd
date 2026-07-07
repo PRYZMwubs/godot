@@ -1,5 +1,5 @@
 class BaseClass:
-	@override
+	override
 	func _get_property_list():
 		return [{"property" : "definition"}]
 
@@ -9,7 +9,7 @@ class SuperClassMethodsRecognized extends BaseClass:
 		var _x = _get_property_list()
 
 class SuperMethodsRecognized extends BaseClass:
-	@override
+	override
 	func _get_property_list():
 		# Recognizes super method.
 		var result = super()

@@ -3,17 +3,17 @@ class A:
 		print(x)
 
 class B extends A:
-	@override
+	override
 	func f(x: int, ...args: Array) -> void:
 		prints(x, args)
 
 class C extends B:
-	@override
+	override
 	func f(x: int, y: int = 0, ...args: Array) -> void:
 		prints(x, y, args)
 
 class D extends C:
-	@override
+	override
 	func f(...args: Array) -> void:
 		print(args)
 

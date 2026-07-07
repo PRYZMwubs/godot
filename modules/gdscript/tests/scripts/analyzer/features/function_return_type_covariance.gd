@@ -14,29 +14,29 @@ class A:
 	func node_to_untyped() -> Node: return null
 
 class B extends A:
-	@override
+	override
 	func variant_to_int() -> int: return 0
-	@override
+	override
 	func variant_to_node() -> Node: return null
-	@override
+	override
 	func node_to_node_2d() -> Node2D: return null
 
-	@override
+	override
 	func untyped_to_void() -> void: pass
-	@override
+	override
 	func untyped_to_variant() -> Variant: return null
-	@override
+	override
 	func untyped_to_int() -> int: return 0
-	@override
+	override
 	func untyped_to_node() -> Node: return null
 
-	@override
+	override
 	func void_to_untyped(): pass
-	@override
+	override
 	func variant_to_untyped(): return null
-	@override
+	override
 	func int_to_untyped(): return 0
-	@override
+	override
 	func node_to_untyped(): return null
 
 func test():

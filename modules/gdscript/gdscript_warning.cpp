@@ -175,7 +175,7 @@ String GDScriptWarning::get_message() const {
 			return R"(Overridden static without using "static" keyword.)";
 		case IMPLICIT_FUNCTION_OVERRIDE:
 			CHECK_SYMBOLS(2);
-			return vformat(R"*(The method "%s()" overrides "%s.%s()" but does not have the "@override" annotation.)*", symbols[0], symbols[1], symbols[0]);
+			return vformat(R"*(The method "%s()" overrides "%s.%s()" but does not have the "override" keyword.)*", symbols[0], symbols[1], symbols[0]);
 #ifndef DISABLE_DEPRECATED
 		// Never produced. These warnings migrated from 3.x by mistake.
 		case PROPERTY_USED_AS_FUNCTION: // There is already an error.

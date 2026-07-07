@@ -148,7 +148,6 @@ GDScriptParser::GDScriptParser() {
 		register_annotation(MethodInfo("@icon", PropertyInfo(Variant::STRING, "icon_path")), AnnotationInfo::SCRIPT, &GDScriptParser::icon_annotation);
 		register_annotation(MethodInfo("@static_unload"), AnnotationInfo::SCRIPT, &GDScriptParser::static_unload_annotation);
 		register_annotation(MethodInfo("@abstract"), AnnotationInfo::SCRIPT | AnnotationInfo::CLASS | AnnotationInfo::FUNCTION, &GDScriptParser::abstract_annotation);
-		register_annotation(MethodInfo("@override"), AnnotationInfo::FUNCTION, &GDScriptParser::override_annotation);
 		// Onready annotation.
 		register_annotation(MethodInfo("@onready"), AnnotationInfo::VARIABLE, &GDScriptParser::onready_annotation);
 		// Export annotations.
@@ -1195,6 +1194,77 @@ void GDScriptParser::parse_class_member(T *(GDScriptParser::*p_parse_function)(b
 }
 
 template <typename T>
+void GDScriptParser::parse_class_member(T *(GDScriptParser::*p_parse_function)(bool, bool, bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static, bool p_is_private, bool p_is_override) {
+	advance();
+
+	// Consume annotations.
+	List<AnnotationNode *> annotations;
+	while (!annotation_stack.is_empty()) {
+		AnnotationNode *last_annotation = annotation_stack.back()->get();
+		if (last_annotation->applies_to(p_target)) {
+			annotations.push_front(last_annotation);
+			annotation_stack.pop_back();
+		} else {
+			push_error(vformat(R"(Annotation "%s" cannot be applied to a %s.)", last_annotation->name, p_member_kind));
+			clear_unused_annotations();
+		}
+	}
+
+	T *member = (this->*p_parse_function)(p_is_static, p_is_private, p_is_override);
+	if (member == nullptr) {
+		return;
+	}
+
+#ifdef TOOLS_ENABLED
+	int doc_comment_line = member->start_line - 1;
+#endif // TOOLS_ENABLED
+
+	for (AnnotationNode *&annotation : annotations) {
+		member->annotations.push_back(annotation);
+#ifdef TOOLS_ENABLED
+		if (annotation->start_line <= doc_comment_line) {
+			doc_comment_line = annotation->start_line - 1;
+		}
+#endif // TOOLS_ENABLED
+	}
+
+#ifdef TOOLS_ENABLED
+	if constexpr (std::is_same_v<T, ClassNode>) {
+		if (has_comment(member->start_line, true)) {
+			// Inline doc comment.
+			member->doc_data = parse_class_doc_comment(member->start_line, true);
+		} else if (has_comment(doc_comment_line, true) && tokenizer->get_comments()[doc_comment_line].new_line) {
+			// Normal doc comment. Don't check `min_member_doc_line` because a class ends parsing after its members.
+			// This may not work correctly for cases like `var a; class B`, but it doesn't matter in practice.
+			member->doc_data = parse_class_doc_comment(doc_comment_line);
+		}
+	} else {
+		if (has_comment(member->start_line, true)) {
+			// Inline doc comment.
+			member->doc_data = parse_doc_comment(member->start_line, true);
+		} else if (doc_comment_line >= min_member_doc_line && has_comment(doc_comment_line, true) && tokenizer->get_comments()[doc_comment_line].new_line) {
+			// Normal doc comment.
+			member->doc_data = parse_doc_comment(doc_comment_line);
+		}
+	}
+
+	min_member_doc_line = member->end_line + 1; // Prevent multiple members from using the same doc comment.
+#endif // TOOLS_ENABLED
+
+	if (member->identifier != nullptr) {
+		if (!((String)member->identifier->name).is_empty()) { // Enums may be unnamed.
+			if (current_class->members_indices.has(member->identifier->name)) {
+				push_error(vformat(R"(%s "%s" has the same name as a previously declared %s.)", p_member_kind.capitalize(), member->identifier->name, current_class->get_member(member->identifier->name).get_type_name()), member->identifier);
+			} else {
+				current_class->add_member(member);
+			}
+		} else {
+			current_class->add_member(member);
+		}
+	}
+}
+
+template <typename T>
 void GDScriptParser::parse_class_member(T *(GDScriptParser::*p_parse_function)(bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_private) {
 	advance();
 
@@ -1340,30 +1410,46 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 	bool class_end = false;
 	bool next_is_static = false;
 	bool next_is_private = false;
+	bool next_is_override = false;
 	while (!class_end && !is_at_end()) {
 		GDScriptTokenizer::Token token = current;
 		switch (token.type) {
 			case GDScriptTokenizer::Token::PRIVATE: {
+				if (next_is_override) {
+					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
+					next_is_override = false;
+				}
 				advance();
 				next_is_private = true;
 			} break;
 			case GDScriptTokenizer::Token::PUBLIC: {
+				if (next_is_override) {
+					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
+					next_is_override = false;
+				}
 				advance();
 			} break;
+			case GDScriptTokenizer::Token::OVERRIDE: {
+				advance();
+				next_is_override = true;
+				if (!check(GDScriptTokenizer::Token::FUNC)) {
+					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
+				}
+			} break;
 			case GDScriptTokenizer::Token::VAR:
-				parse_class_member(&GDScriptParser::parse_variable, AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				if (next_is_static) {
 					current_class->has_static_data = true;
 				}
 				break;
 			case GDScriptTokenizer::Token::LET:
-				parse_class_member(&GDScriptParser::parse_immutable_variable, AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_immutable_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				if (next_is_static) {
 					current_class->has_static_data = true;
 				}
 				break;
 			case GDScriptTokenizer::Token::TK_CONST:
-				parse_class_member(&GDScriptParser::parse_constant, AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_private);
+				parse_class_member(static_cast<ConstantNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_constant), AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::SIGNAL:
 				if (next_is_private) {
@@ -1372,7 +1458,8 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				parse_class_member(&GDScriptParser::parse_signal, AnnotationInfo::SIGNAL, "signal");
 				break;
 			case GDScriptTokenizer::Token::FUNC:
-				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_private);
+				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_private, next_is_override);
+				next_is_override = false;
 				break;
 			case GDScriptTokenizer::Token::CLASS:
 				if (_is_trait) {
@@ -1393,6 +1480,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STATIC: {
+				if (next_is_override) {
+					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
+					next_is_override = false;
+				}
 				advance();
 				next_is_static = true;
 				if (!check(GDScriptTokenizer::Token::FUNC) && !check(GDScriptTokenizer::Token::VAR) && !check(GDScriptTokenizer::Token::LET)) {
@@ -2096,10 +2187,11 @@ bool GDScriptParser::parse_function_signature(FunctionNode *p_function, SuiteNod
 	return match(GDScriptTokenizer::Token::COLON);
 }
 
-GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static, bool p_is_private) {
+GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static, bool p_is_private, bool p_is_override) {
 	FunctionNode *function = alloc_node<FunctionNode>();
 	function->is_static = p_is_static;
 	function->is_private = p_is_private;
+	function->is_marked_as_override = p_is_override;
 
 	make_completion_context(COMPLETION_OVERRIDE_METHOD, function);
 
@@ -4717,6 +4809,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ &GDScriptParser::parse_yield,                     nullptr,                                      PREC_NONE }, // YIELD,
 		{ nullptr,											nullptr,										PREC_NONE }, // PRIVATE,
 		{ nullptr,											nullptr,										PREC_NONE }, // PUBLIC,
+		{ nullptr,                                          nullptr,                                        PREC_NONE }, // OVERRIDE,
 		// Punctuation
 		{ &GDScriptParser::parse_array,                  	&GDScriptParser::parse_subscript,            	PREC_SUBSCRIPT }, // BRACKET_OPEN,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // BRACKET_CLOSE,
@@ -4909,24 +5002,6 @@ bool GDScriptParser::abstract_annotation(AnnotationNode *p_annotation, Node *p_t
 		return true;
 	}
 	ERR_FAIL_V_MSG(false, R"("@abstract" annotation can only be applied to classes and functions.)");
-}
-
-bool GDScriptParser::override_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class) {
-	if (p_target->type == Node::FUNCTION) {
-		FunctionNode *function_node = static_cast<FunctionNode *>(p_target);
-		if (function_node->is_static) {
-			push_error(R"("@override" annotation cannot be applied to static functions.)", p_annotation);
-			return false;
-		}
-		if (function_node->is_marked_as_override) {
-			push_error(R"("@override" annotation can only be applied once per function.)", p_annotation);
-			return false;
-		}
-		// The only thing we can do here is record that we have the annotation. The analyzer gets to do the rest.
-		function_node->is_marked_as_override = true;
-		return true;
-	}
-	ERR_FAIL_V_MSG(false, R"("@override" annotation can only be applied to functions.)");
 }
 
 bool GDScriptParser::onready_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class) {

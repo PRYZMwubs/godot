@@ -925,11 +925,11 @@ public:
 		bool is_coroutine = false;
 
 		// If this function is known to override a function in the parent type.
-		// If a function is an override, but does not have the @override annotation, a warning is raised.
+		// If a function is an override, but does not have the override keyword, a warning is raised.
 		// The value of this field is undefined unless resolved_signature is true.
 		bool is_override = false;
 
-		// If this function node has the @override annotation. This does not indicate if the function is actually an override or not.
+		// If this function node has the override keyword. This does not indicate if the function is actually an override or not.
 		bool is_marked_as_override = false;
 
 		Variant rpc_config;
@@ -1667,6 +1667,8 @@ private:
 	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool, bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static = false, bool p_is_private = false);
 	template <typename T>
+	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool, bool, bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static = false, bool p_is_private = false, bool p_is_override = false);
+	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_private = false);
 	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(), AnnotationInfo::TargetKind p_target, const String &p_member_kind);
@@ -1675,7 +1677,7 @@ private:
 	StructNode *parse_struct(bool p_is_static, bool p_is_private);
 	EnumNode *parse_enum(bool p_is_static, bool p_is_private);
 	ParameterNode *parse_parameter();
-	FunctionNode *parse_function(bool p_is_static, bool p_is_private);
+	FunctionNode *parse_function(bool p_is_static, bool p_is_private, bool p_is_override = false);
 	bool parse_function_signature(FunctionNode *p_function, SuiteNode *p_body, const String &p_type, int p_signature_start);
 	SuiteNode *parse_suite(const String &p_context, SuiteNode *p_suite = nullptr, bool p_for_lambda = false);
 	// Annotations
@@ -1687,7 +1689,6 @@ private:
 	bool icon_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool static_unload_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool abstract_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
-	bool override_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool onready_annotation(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	template <PropertyHint t_hint, Variant::Type t_type>
 	bool export_annotations(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
