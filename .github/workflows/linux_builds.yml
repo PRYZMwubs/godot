@@ -127,9 +127,8 @@ jobs:
         run: |
           # GitHub-hosted runners may ship Microsoft apt sources that intermittently
           # return invalid signed metadata ("NOSPLIT"), breaking apt-get update.
-          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name "*.list" -o -name "*.sources" \) -print0 | \
-            xargs -0 -r sudo sed -i '/packages\.microsoft\.com/d'
-          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list || true
+          sudo grep -R -l -E 'packages\.microsoft\.com' /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null | \
+            xargs -r sudo rm -f
           sudo apt-get update
           sudo apt-get install libwayland-bin  # TODO: Figure out somehow how to embed this one.
           if [ "${{ matrix.proj-test }}" == "true" -o "${{ matrix.proj-export }}" == "true" ]; then
