@@ -1382,6 +1382,7 @@ public:
 		bool is_static = false;
 		bool is_private = false;
 		bool is_immutable = false;
+		bool readonly = false;
 #ifdef TOOLS_ENABLED
 		MemberDocData doc_data;
 #endif // TOOLS_ENABLED
