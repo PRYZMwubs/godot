@@ -1649,16 +1649,16 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				break;
 		}
-		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_static = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_private = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_final = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_override = false;
 		}
 		if (panic_mode) {
