@@ -74,6 +74,24 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="final">
+			<return type="void" />
+			<description>
+				Marks the following class or function as final. A final class cannot be extended, and a final function cannot be overridden.
+				[codeblock]
+				final class_name A
+
+				class B extends A: # Error: The base class is marked as final and cannot be extended.
+					pass
+				[/codeblock]
+				[codeblock]
+				class Base:
+					final func my_method():
+						pass
+				[/codeblock]
+				[b]Note:[/b] [method final] is a keyword, not a function. So it cannot be accessed as a [Callable].
+			</description>
+		</method>
 		<method name="dict_to_inst" deprecated="Consider using [method JSON.to_native] or [method Object.get_property_list] instead.">
 			<return type="Object" />
 			<param index="0" name="dictionary" type="Dictionary" />
@@ -185,6 +203,23 @@
 				print(ord("🤖")) # Prints 129302
 				[/codeblock]
 				This is the inverse of [method char]. See also [method String.chr] and [method String.unicode_at].
+			</description>
+		</method>
+		<method name="override">
+			<return type="void" />
+			<description>
+				Marks the following function as an override. An override function must override a function defined in a parent class.
+				Functions that override parent functions but omit this keyword raise a warning.
+				[codeblock]
+				class Shape:
+					func draw():
+						pass
+
+				class Circle extends Shape:
+					override func draw():
+						print("Drawing a circle.")
+				[/codeblock]
+				[b]Note:[/b] [method override] is a keyword, not a function. So it cannot be accessed as a [Callable].
 			</description>
 		</method>
 		<method name="preload">
@@ -760,45 +795,6 @@
 				var undo_redo = Engine.get_singleton(&amp;"EditorInterface").get_editor_undo_redo()
 				[/codeblock]
 				[b]Note:[/b] Avoid storing lambda callables in member variables of [RefCounted]-based classes (e.g. resources), as this can lead to memory leaks. Use only method callables and optionally [method Callable.bind] or [method Callable.unbind].
-			</description>
-		</annotation>
-		<annotation name="@final">
-			<return type="void" />
-			<description>
-				Modifies the following class or method as final. A final class may not be extended, and a final method may not be overridden.
-				You can annotate a class (including anonymous scripts) as final:
-				[codeblock]
-				# A.gd
-				@final class_name A
-
-				# B.gd
-				class_name B extends A # Error: The base class "A" is marked as final and cannot be extended.
-
-				# C.gd
-				@final extends RefCounted
-				[/codeblock]
-				You can also annotate a method as final:
-				[codeblock]
-				# E.gd
-				class_name E extends Node
-
-				@final func my_final_method():
-				    pass
-
-				# F.gd
-				class_name F extends E
-
-				func my_final_method(): # Error: The method "my_final_method" is marked as final and cannot be overridden.
-				    pass
-				[/codeblock]
-				Final scripts cannot be attached to nodes whose types do not match the script base type exactly. For example, given the following script:
-				[codeblock]
-				# MyNode.gd
-				@final extends Node
-				[/codeblock]
-				This script can only be attached to a node whose direct type is [code skip-lint]Node[/code], but not a descendent of Node (e.g., [code skip-lint]Node2D[/code]).
-				[b]Note:[/b] The annotation [code skip-lint]@final[/code] is a modifier, meaning that it is syntax-related instead of engine-specific.
-				[b]Note:[/b] Abstract classes and methods cannot be marked as final, and vice versa.
 			</description>
 		</annotation>
 		<annotation name="@icon">

@@ -115,6 +115,7 @@ public:
 			TK_CONST, // Conflict with WinAPI.
 			ENUM,
 			EXTENDS,
+			FINAL,
 			FUNC,
 			TK_IN, // Conflict with WinAPI.
 			IS,

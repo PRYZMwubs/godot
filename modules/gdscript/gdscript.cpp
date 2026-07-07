@@ -2688,6 +2688,7 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		"const",
 		"enum",
 		"extends",
+		"final",
 		"func",
 		"namespace", // Reserved for potential future use.
 		"private",

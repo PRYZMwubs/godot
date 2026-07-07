@@ -1721,7 +1721,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 
 	static const char *_keywords_with_space[] = {
 		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "is", "func", "signal", "await",
-		"const", "enum", "static", "var", "let", "if", "elif", "else", "for", "match", "when", "while", "private", "public", "override", "struct",
+		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "public", "override", "struct",
 		nullptr
 	};
 
@@ -3558,18 +3558,29 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
  */
 static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptParser::CompletionContext &ctx, const Vector<String> &code_by_line) {
 	int line = ctx.current_line - 1; // The ctx current line is one-indexed, but the code_by_line is zero-indexed.
-	// Backtrack in the current line and upwards a few lines to search for the override keyword. If we don't see it, apply it on the line above the `func` keyword.
+	// Backtrack in the current line and upwards a few lines to search for the override keyword.
+	// If we don't see it, inject `override` inline before the `func` keyword.
 	bool has_override_modifier = false;
 	int lines_traversed = 0;
 	int func_line = -1; // Generally speaking we expect the line with `func` to be the current line, but for sanity we'll search for it anyway.
+	int func_column = -1;
 
 	while (!has_override_modifier && lines_traversed < 10 && line >= 0) {
 		String text = code_by_line.get(line);
 		String stripped_text = text.strip_edges();
 
-		if (text.contains("func")) {
+		int found_func = text.find("func");
+		if (found_func != -1) {
 			if (func_line == -1) {
 				func_line = line;
+				func_column = found_func;
+
+				// If override already appears on the same declaration line before func, don't add it again.
+				String before_func = text.substr(0, found_func);
+				if (before_func.contains("override")) {
+					has_override_modifier = true;
+					break;
+				}
 			} else {
 				break; // We've hit another `func` decl. Anything in or above this line doesn't apply to this function anymore.
 			}
@@ -3587,19 +3598,30 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 	if (!has_override_modifier && func_line != -1) {
 		String text = code_by_line.get(func_line);
 		ScriptLanguage::TextEdit edit;
-		edit.start = { func_line - 1, 0 }; // Always start at the base of the line above the func_line
-		edit.end = { func_line, 0 }; // And then end on the func line itself.
 
-		// What we actually need to do here is replace whatever the line above the func_line was with "<line>\noverride\n"
-		// But the override keyword has to have the same indentation level as the func_line.
+		int insert_column = text.length() - text.lstrip(" \t").length();
+		String declaration_start = text.substr(insert_column);
+		if (declaration_start.begins_with("public ")) {
+			insert_column += 7;
+		} else if (declaration_start.begins_with("private ")) {
+			insert_column += 8;
+		}
 
-		int func_column = text.length() - text.lstrip(" \t").length();
-		String new_text = code_by_line.get(func_line - 1);
-		new_text = new_text + "\n" + text.substr(0, func_column) + "override\n";
+		// Guard against malformed lines where `func` appears before the computed insertion point.
+		if (func_column != -1 && insert_column <= func_column) {
+			edit.start = { func_line, insert_column };
+			edit.end = { func_line, insert_column };
+			edit.new_text = "override ";
+			return { edit };
+		}
 
-		edit.new_text = new_text;
-
-		return { edit };
+		// Fallback: prepend before the first `func` token we found.
+		if (func_column != -1) {
+			edit.start = { func_line, func_column };
+			edit.end = { func_line, func_column };
+			edit.new_text = "override ";
+			return { edit };
+		}
 	}
 
 	return {};

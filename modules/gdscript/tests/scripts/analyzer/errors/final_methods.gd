@@ -1,8 +1,8 @@
 class A:
-    @final func foo():
+    final func foo():
         pass
 
-    @final func bar():
+    final func bar():
         pass
 
 class B extends A:

@@ -1,7 +1,7 @@
-@final @abstract class AbstractFinalClass:
+@abstract final class AbstractFinalClass:
     pass
 
-@final class A:
+final class A:
     pass
 
 class B extends A:
