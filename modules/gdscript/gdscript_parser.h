@@ -1521,6 +1521,7 @@ private:
 	bool in_lambda = false;
 	bool lambda_ended = false; // Marker for when a lambda ends, to apply an end of statement if needed.
 	bool pending_function_is_final = false;
+	bool pending_variable_is_readonly = false;
 
 	typedef bool (GDScriptParser::*AnnotationAction)(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	struct AnnotationInfo {

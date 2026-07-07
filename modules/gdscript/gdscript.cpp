@@ -2693,6 +2693,7 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		"namespace", // Reserved for potential future use.
 		"private",
 		"public",
+		"readonly",
 		"signal",
 		"static",
 		"struct",

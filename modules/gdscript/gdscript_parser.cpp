@@ -630,6 +630,7 @@ void GDScriptParser::synchronize() {
 			case GDScriptTokenizer::Token::CLASS:
 			case GDScriptTokenizer::Token::TRAIT:
 			case GDScriptTokenizer::Token::FINAL:
+			case GDScriptTokenizer::Token::READONLY:
 			case GDScriptTokenizer::Token::FUNC:
 			case GDScriptTokenizer::Token::STATIC:
 			case GDScriptTokenizer::Token::VAR:
@@ -1419,6 +1420,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 	bool next_is_private = false;
 	bool next_is_override = false;
 	bool next_is_final = false;
+	bool next_is_readonly = false;
 	while (!class_end && !is_at_end()) {
 		GDScriptTokenizer::Token token = current;
 		switch (token.type) {
@@ -1431,6 +1433,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword must come before the "func" or "class" keyword, after any access modifiers.)");
 					next_is_final = false;
 				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword must come before the "var" keyword, after any access modifiers.)");
+					next_is_readonly = false;
+				}
 				advance();
 				next_is_private = true;
 			} break;
@@ -1442,6 +1448,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				if (next_is_final) {
 					push_error(R"(The "final" keyword must come before the "func" or "class" keyword, after any access modifiers.)");
 					next_is_final = false;
+				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword must come before the "var" keyword, after any access modifiers.)");
+					next_is_readonly = false;
 				}
 				advance();
 				next_is_private = false;
@@ -1460,6 +1470,13 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				next_is_final = true;
 			} break;
+			case GDScriptTokenizer::Token::READONLY: {
+				advance();
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used once in a declaration.)");
+				}
+				next_is_readonly = true;
+			} break;
 			case GDScriptTokenizer::Token::VAR:
 				if (next_is_override) {
 					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
@@ -1469,7 +1486,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
 					next_is_final = false;
 				}
+				pending_variable_is_readonly = next_is_readonly;
 				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				pending_variable_is_readonly = false;
+				next_is_readonly = false;
 				if (next_is_static) {
 					current_class->has_static_data = true;
 				}
@@ -1482,6 +1502,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				if (next_is_final) {
 					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
 					next_is_final = false;
+				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
 				}
 				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_immutable_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				if (next_is_static) {
@@ -1497,6 +1521,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
 					next_is_final = false;
 				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				parse_class_member(static_cast<ConstantNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_constant), AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::SIGNAL:
@@ -1508,12 +1536,20 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
 					next_is_final = false;
 				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				if (next_is_private) {
 					push_error(R"(The "private" keyword cannot be applied to "signal".)");
 				}
 				parse_class_member(&GDScriptParser::parse_signal, AnnotationInfo::SIGNAL, "signal");
 				break;
 			case GDScriptTokenizer::Token::FUNC:
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				pending_function_is_final = next_is_final;
 				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_private, next_is_override);
 				pending_function_is_final = false;
@@ -1521,6 +1557,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				next_is_final = false;
 				break;
 			case GDScriptTokenizer::Token::CLASS:
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				if (_is_trait) {
 					push_error(R"(class can not be a member of a trait.)");
 				}
@@ -1536,6 +1576,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "override" keyword can only be used directly before a function declaration.)");
 					next_is_override = false;
 				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				bool previous_parsing_trait = _is_trait;
 				_is_trait = true;
 				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::TRAIT, "trait", false, next_is_private);
@@ -1550,6 +1594,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
 					next_is_final = false;
 				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STRUCT:
@@ -1561,6 +1609,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "final" keyword can only be used directly before a class or function declaration.)");
 					next_is_final = false;
 				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
+					next_is_readonly = false;
+				}
 				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct", false, next_is_private);
 				break;
 			case GDScriptTokenizer::Token::STATIC: {
@@ -1571,6 +1623,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				if (next_is_final) {
 					push_error(R"(The "final" keyword cannot be combined with "static".)");
 					next_is_final = false;
+				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword cannot be combined with "static".)");
+					next_is_readonly = false;
 				}
 				advance();
 				next_is_static = true;
@@ -1649,17 +1705,20 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				break;
 		}
-		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_static = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_private = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_final = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_override = false;
+		}
+		if (token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::NEWLINE) {
+			next_is_readonly = false;
 		}
 		if (panic_mode) {
 			synchronize();
@@ -1697,6 +1756,11 @@ GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, b
 	variable->is_static = p_is_static;
 	variable->is_private = p_is_private;
 	variable->is_immutable = p_is_immutable;
+	variable->readonly = pending_variable_is_readonly;
+
+	if (variable->readonly && variable->is_static) {
+		push_error(R"(The "readonly" keyword cannot be applied to a static variable.)", variable);
+	}
 
 	if (match(GDScriptTokenizer::Token::COLON)) {
 		if (check(GDScriptTokenizer::Token::NEWLINE)) {
@@ -1740,9 +1804,17 @@ GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, b
 
 	if (p_allow_property && match(GDScriptTokenizer::Token::COLON)) {
 		if (match(GDScriptTokenizer::Token::NEWLINE)) {
-			return parse_property(variable, true);
+			VariableNode *property = parse_property(variable, true);
+			if (variable->readonly && variable->setter != nullptr) {
+				push_error(R"(The "readonly" keyword cannot be used with a variable that has a setter.)", variable);
+			}
+			return property;
 		} else {
-			return parse_property(variable, false);
+			VariableNode *property = parse_property(variable, false);
+			if (variable->readonly && variable->setter != nullptr) {
+				push_error(R"(The "readonly" keyword cannot be used with a variable that has a setter.)", variable);
+			}
+			return property;
 		}
 	}
 
@@ -4912,6 +4984,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ &GDScriptParser::parse_yield,                     nullptr,                                      PREC_NONE }, // YIELD,
 		{ nullptr,											nullptr,										PREC_NONE }, // PRIVATE,
 		{ nullptr,											nullptr,										PREC_NONE }, // PUBLIC,
+		{ nullptr,										nullptr,										PREC_NONE }, // READONLY,
 		// Punctuation
 		{ &GDScriptParser::parse_array,                  	&GDScriptParser::parse_subscript,            	PREC_SUBSCRIPT }, // BRACKET_OPEN,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // BRACKET_CLOSE,

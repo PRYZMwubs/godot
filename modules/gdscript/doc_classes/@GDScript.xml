@@ -301,6 +301,16 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="readonly">
+			<return type="void" />
+			<description>
+				Marks the following class variable as read-only. Read-only variables can only be assigned a value once, either at declaration or in the constructor ([method Object._init]). Any further assignment will result in an error.
+				[codeblock]
+				readonly var size = 10
+				[/codeblock]
+				[b]Note:[/b] [method readonly] is a keyword, not a function. So it cannot be accessed as a [Callable].
+			</description>
+		</method>
 		<method name="type_exists" deprecated="Use [method ClassDB.class_exists] instead.">
 			<return type="bool" />
 			<param index="0" name="type" type="StringName" />

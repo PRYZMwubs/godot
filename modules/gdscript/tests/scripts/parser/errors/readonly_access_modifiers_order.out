@@ -1,0 +1,1 @@
+GDTEST_PARSER_ERROR The "readonly" keyword must come before the "var" keyword, after any access modifiers.

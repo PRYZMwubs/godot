@@ -131,6 +131,7 @@ static const char *token_names[] = {
 	"yield", // YIELD,
 	"private", // PRIVATE,
 	"public", // PUBLIC,
+	"readonly", // READONLY,
 	// Punctuation
 	"[", // BRACKET_OPEN,
 	"]", // BRACKET_CLOSE,
@@ -268,6 +269,7 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case WHILE:
 		case WHEN:
 		case YIELD:
+		case READONLY:
 			return true;
 		default:
 			return false;
@@ -539,6 +541,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("private", Token::PRIVATE) \
 	KEYWORD("public", Token::PUBLIC) \
 	KEYWORD_GROUP('r') \
+	KEYWORD("readonly", Token::READONLY) \
 	KEYWORD("return", Token::RETURN) \
 	KEYWORD_GROUP('s') \
 	KEYWORD("self", Token::SELF) \

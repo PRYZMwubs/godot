@@ -502,6 +502,12 @@ void GDScriptLanguage::get_public_functions(List<MethodInfo> *p_functions) const
 		mi.return_val.type = Variant::NIL;
 		p_functions->push_back(mi);
 	}
+	{
+		MethodInfo mi;
+		mi.name = "readonly";
+		mi.return_val.type = Variant::NIL;
+		p_functions->push_back(mi);
+	}
 }
 
 void GDScriptLanguage::get_public_constants(List<Pair<String, Variant>> *p_constants) const {
@@ -1733,7 +1739,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 
 	static const char *_keywords_with_space[] = {
 		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "is", "func", "signal", "await",
-		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "public", "override", "struct",
+		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "public", "readonly", "override", "struct",
 		nullptr
 	};
 

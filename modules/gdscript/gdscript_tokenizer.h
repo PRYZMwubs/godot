@@ -136,6 +136,7 @@ public:
 			YIELD,
 			PRIVATE,
 			PUBLIC,
+			READONLY,
 			// Punctuation
 			BRACKET_OPEN,
 			BRACKET_CLOSE,
