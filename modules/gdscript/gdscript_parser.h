@@ -523,6 +523,7 @@ public:
 	struct CallNode : public ExpressionNode {
 		ExpressionNode *callee = nullptr;
 		Vector<ExpressionNode *> arguments;
+		Vector<StringName> argument_names;
 		StringName function_name;
 		bool is_super = false;
 		bool is_static = false;

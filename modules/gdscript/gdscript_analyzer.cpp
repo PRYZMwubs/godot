@@ -2378,7 +2378,7 @@ void GDScriptAnalyzer::resolve_function_signature(GDScriptParser::FunctionNode *
 		int default_par_count = 0;
 		BitField<MethodFlags> method_flags = {};
 		StringName native_base;
-		if (!p_is_lambda && get_function_signature(p_function, false, base_type, function_name, parent_return_type, parameters_types, default_par_count, method_flags, &native_base)) {
+		if (!p_is_lambda && get_function_signature(p_function, false, base_type, function_name, parent_return_type, parameters_types, default_par_count, method_flags, nullptr, &native_base)) {
 			bool valid = p_function->is_static == method_flags.has_flag(METHOD_FLAG_STATIC);
 
 			if (p_function->return_type == nullptr) {
@@ -4012,6 +4012,13 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 		} else if (GDScriptUtilityFunctions::function_exists(function_name)) {
 			MethodInfo function_info = GDScriptUtilityFunctions::get_function_info(function_name);
 
+			Vector<StringName> parameter_names;
+			parameter_names.reserve(function_info.arguments.size());
+			for (const PropertyInfo &E : function_info.arguments) {
+				parameter_names.push_back(E.name);
+			}
+			validate_named_call_arguments(parameter_names, p_call, "utility function");
+
 			if (!p_is_root && !p_is_await && function_info.return_val.type == Variant::NIL && ((function_info.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) == 0)) {
 				push_error(vformat(R"*(Cannot get return value of call to "%s()" because it returns "void".)*", function_name), p_call);
 			}
@@ -4062,6 +4069,13 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 			return;
 		} else if (Variant::has_utility_function(function_name)) {
 			MethodInfo function_info = info_from_utility_func(function_name);
+
+			Vector<StringName> parameter_names;
+			parameter_names.reserve(function_info.arguments.size());
+			for (const PropertyInfo &E : function_info.arguments) {
+				parameter_names.push_back(E.name);
+			}
+			validate_named_call_arguments(parameter_names, p_call, "utility function");
 
 			if (!p_is_root && !p_is_await && function_info.return_val.type == Variant::NIL && ((function_info.return_val.usage & PROPERTY_USAGE_NIL_IS_VARIANT) == 0)) {
 				push_error(vformat(R"*(Cannot get return value of call to "%s()" because it returns "void".)*", function_name), p_call);
@@ -4216,6 +4230,14 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 			call_type.is_meta_type = false;
 			call_type.is_constant = false;
 			GDScriptParser::StructNode *struct_node = call_type.struct_type;
+
+			Vector<StringName> parameter_names;
+			parameter_names.reserve(struct_node->members.size());
+			for (const GDScriptParser::VariableNode *member : struct_node->members) {
+				parameter_names.push_back(member->identifier->name);
+			}
+			validate_named_call_arguments(parameter_names, p_call, "struct constructor");
+
 			if (p_call->arguments.size() > struct_node->members.size()) {
 				push_error(vformat(R"*(Too many arguments for "%s()" constructor. Expected at most %d but received %d.)*", p_call->function_name, struct_node->members.size(), p_call->arguments.size()), p_call);
 			}
@@ -4253,6 +4275,7 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 	BitField<MethodFlags> method_flags = {};
 	GDScriptParser::DataType return_type;
 	List<GDScriptParser::DataType> par_types;
+	Vector<StringName> par_names;
 
 	bool is_constructor = (base_type.is_meta_type || (p_call->callee && p_call->callee->type == GDScriptParser::Node::IDENTIFIER)) && p_call->function_name == SNAME("new");
 
@@ -4267,7 +4290,7 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 		}
 	}
 
-	if (get_function_signature(p_call, is_constructor, base_type, p_call->function_name, return_type, par_types, default_arg_count, method_flags)) {
+	if (get_function_signature(p_call, is_constructor, base_type, p_call->function_name, return_type, par_types, default_arg_count, method_flags, &par_names)) {
 		p_call->is_static = method_flags.has_flag(METHOD_FLAG_STATIC);
 		// If the method is implemented in the class hierarchy, the virtual/abstract flag will not be set for that `MethodInfo` and the search stops there.
 		// Virtual/abstract check only possible for super calls because class hierarchy is known. Objects may have scripts attached we don't know of at compile-time.
@@ -4294,6 +4317,7 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 				update_dictionary_literal_element_type(E.value, key, value);
 			}
 		}
+		validate_named_call_arguments(par_names, p_call, "function");
 		validate_call_arg(par_types, default_arg_count, method_flags.has_flag(METHOD_FLAG_VARARG), p_call);
 
 		if (base_type.kind == GDScriptParser::DataType::ENUM && base_type.is_meta_type) {
@@ -6800,9 +6824,12 @@ GDScriptParser::DataType GDScriptAnalyzer::type_from_property(const PropertyInfo
 	return result;
 }
 
-bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bool p_is_constructor, GDScriptParser::DataType p_base_type, const StringName &p_function, GDScriptParser::DataType &r_return_type, List<GDScriptParser::DataType> &r_par_types, int &r_default_arg_count, BitField<MethodFlags> &r_method_flags, StringName *r_native_class) {
+bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bool p_is_constructor, GDScriptParser::DataType p_base_type, const StringName &p_function, GDScriptParser::DataType &r_return_type, List<GDScriptParser::DataType> &r_par_types, int &r_default_arg_count, BitField<MethodFlags> &r_method_flags, Vector<StringName> *r_par_names, StringName *r_native_class) {
 	r_method_flags = METHOD_FLAGS_DEFAULT;
 	r_default_arg_count = 0;
+	if (r_par_names) {
+		r_par_names->clear();
+	}
 	if (r_native_class) {
 		*r_native_class = StringName();
 	}
@@ -6843,7 +6870,7 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 
 		for (const MethodInfo &E : methods) {
 			if (E.name == p_function) {
-				function_signature_from_info(E, r_return_type, r_par_types, r_default_arg_count, r_method_flags);
+				function_signature_from_info(E, r_return_type, r_par_types, r_default_arg_count, r_method_flags, r_par_names);
 				// Cannot use non-const methods on enums.
 				if (!r_method_flags.has_flag(METHOD_FLAG_STATIC) && was_enum && !(E.flags & METHOD_FLAG_CONST)) {
 					push_error(vformat(R"*(Cannot call non-const Dictionary function "%s()" on enum "%s".)*", p_function, p_base_type.enum_type), p_source);
@@ -6897,6 +6924,12 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 				return false;
 			}
 			found_function = base_class->get_member(function_name).function;
+			if (r_par_names) {
+				r_par_names->clear();
+				for (GDScriptParser::ParameterNode *parameter : found_function->parameters) {
+					r_par_names->push_back(parameter->identifier->name);
+				}
+			}
 		}
 
 		resolve_class_inheritance(base_class, p_source);
@@ -6933,7 +6966,7 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 		MethodInfo info = base_script->get_method_info(function_name);
 
 		if (!(info == MethodInfo())) {
-			return function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags);
+			return function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags, r_par_names);
 		}
 		base_script = base_script->get_base_script();
 	}
@@ -6944,7 +6977,7 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 		StringName script_class = p_base_type.kind == GDScriptParser::DataType::SCRIPT ? p_base_type.script_type->get_class_name() : StringName(GDScript::get_class_static());
 
 		if (ClassDB::get_method_info(script_class, function_name, &info)) {
-			return function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags);
+			return function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags, r_par_names);
 		}
 	}
 
@@ -6958,7 +6991,7 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 
 	MethodInfo info;
 	if (ClassDB::get_method_info(base_native, function_name, &info)) {
-		bool valid = function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags);
+		bool valid = function_signature_from_info(info, r_return_type, r_par_types, r_default_arg_count, r_method_flags, r_par_names);
 		if (valid && Engine::get_singleton()->has_singleton(base_native)) {
 			r_method_flags.set_flag(METHOD_FLAG_STATIC);
 		}
@@ -6974,16 +7007,48 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 	return false;
 }
 
-bool GDScriptAnalyzer::function_signature_from_info(const MethodInfo &p_info, GDScriptParser::DataType &r_return_type, List<GDScriptParser::DataType> &r_par_types, int &r_default_arg_count, BitField<MethodFlags> &r_method_flags) {
+bool GDScriptAnalyzer::function_signature_from_info(const MethodInfo &p_info, GDScriptParser::DataType &r_return_type, List<GDScriptParser::DataType> &r_par_types, int &r_default_arg_count, BitField<MethodFlags> &r_method_flags, Vector<StringName> *r_par_names) {
 	r_return_type = type_from_property(p_info.return_val);
 	r_default_arg_count = p_info.default_arguments.size();
 	r_method_flags = p_info.flags;
 
 	for (const PropertyInfo &E : p_info.arguments) {
 		r_par_types.push_back(type_from_property(E, true));
+		if (r_par_names) {
+			r_par_names->push_back(E.name);
+		}
 	}
 	return true;
 }
+// END MKR 6
+
+void GDScriptAnalyzer::validate_named_call_arguments(const Vector<StringName> &p_parameter_names, const GDScriptParser::CallNode *p_call, const char *p_kind) {
+	bool seen_named_argument = false;
+	const int parameter_count = p_parameter_names.size();
+
+	for (int i = 0; i < p_call->arguments.size(); i++) {
+		const StringName argument_name = p_call->argument_names[i];
+		if (argument_name.is_empty()) {
+			if (seen_named_argument) {
+				push_error(vformat(R"*(Positional arguments must come before named arguments in %s call "%s()".)*", p_kind, p_call->function_name), p_call->arguments[i]);
+				return;
+			}
+			continue;
+		}
+
+		seen_named_argument = true;
+		if (i >= parameter_count) {
+			push_error(vformat(R"*(Unknown named argument "%s" in %s call to "%s()".)*", argument_name, p_kind, p_call->function_name), p_call->arguments[i]);
+			return;
+		}
+
+		if (p_parameter_names[i] != argument_name) {
+			push_error(vformat(R"*(Named argument "%s" does not match parameter "%s" in %s call to "%s()".)*", argument_name, p_parameter_names[i], p_kind, p_call->function_name), p_call->arguments[i]);
+			return;
+		}
+	}
+}
+// END MKR 6
 
 void GDScriptAnalyzer::validate_call_arg(const MethodInfo &p_method, const GDScriptParser::CallNode *p_call) {
 	List<GDScriptParser::DataType> arg_types;

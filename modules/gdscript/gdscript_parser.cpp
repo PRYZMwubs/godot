@@ -3920,10 +3920,19 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_call(ExpressionNode *p_pre
 			break;
 		}
 		ExpressionNode *argument = parse_expression(false);
+		StringName argument_name;
+
+		if (argument != nullptr && argument->type == Node::IDENTIFIER && check(GDScriptTokenizer::Token::COLON)) {
+			argument_name = static_cast<IdentifierNode *>(argument)->name;
+			advance(); // Consume ':'
+			argument = parse_expression(false);
+		}
+
 		if (argument == nullptr) {
 			push_error(R"(Expected expression as the function argument.)");
 		} else {
 			call->arguments.push_back(argument);
+			call->argument_names.push_back(argument_name);
 
 			if (argument->type == Node::LITERAL) {
 				override_completion_context(argument, ct, call, argument_index);

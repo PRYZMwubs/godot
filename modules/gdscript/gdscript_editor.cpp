@@ -807,7 +807,6 @@ static String _make_arguments_hint(const GDScriptParser::FunctionNode *p_functio
 			arghint = p_function->get_datatype().to_string() + " " + p_function->identifier->name + "(";
 		}
 	}
-
 	for (int i = 0; i < p_function->parameters.size(); i++) {
 		if (i > 0) {
 			arghint += ", ";
@@ -893,6 +892,38 @@ static String _make_arguments_hint(const GDScriptParser::FunctionNode *p_functio
 	arghint += ")";
 
 	return arghint;
+}
+
+static void _add_argument_name_options(const MethodInfo &p_info, int p_arg_idx, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
+	if (p_arg_idx < 0 || p_arg_idx >= p_info.arguments.size()) {
+		return;
+	}
+
+	const PropertyInfo &E = p_info.arguments[p_arg_idx];
+	if (E.name.is_empty()) {
+		return;
+	}
+
+	const String display = String(E.name) + ":";
+	ScriptLanguage::CodeCompletionOption option(display, ScriptLanguage::CODE_COMPLETION_KIND_PLAIN_TEXT);
+	option.insert_text = String(E.name) + ": ";
+	r_result.insert(option.display, option);
+}
+
+static void _add_argument_name_options(const GDScriptParser::FunctionNode *p_function, int p_arg_idx, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
+	if (p_arg_idx < 0 || p_arg_idx >= p_function->parameters.size()) {
+		return;
+	}
+
+	const GDScriptParser::ParameterNode *parameter = p_function->parameters[p_arg_idx];
+	if (parameter->identifier == nullptr || parameter->identifier->name.is_empty()) {
+		return;
+	}
+
+	const String display = String(parameter->identifier->name) + ":";
+	ScriptLanguage::CodeCompletionOption option(display, ScriptLanguage::CODE_COMPLETION_KIND_PLAIN_TEXT);
+	option.insert_text = String(parameter->identifier->name) + ": ";
+	r_result.insert(option.display, option);
 }
 
 /**
@@ -3110,6 +3141,7 @@ static void _list_call_arguments(GDScriptParser::CompletionContext &p_context, c
 
 					if (member.type == GDScriptParser::ClassNode::Member::FUNCTION) {
 						r_arghint = _make_arguments_hint(member.function, p_argidx);
+						_add_argument_name_options(member.function, p_argidx, r_result);
 						return;
 					}
 				}
@@ -3118,7 +3150,9 @@ static void _list_call_arguments(GDScriptParser::CompletionContext &p_context, c
 			} break;
 			case GDScriptParser::DataType::SCRIPT: {
 				if (base_type.script_type->is_valid() && base_type.script_type->has_method(method)) {
-					r_arghint = _make_arguments_hint(base_type.script_type->get_method_info(method), p_argidx);
+					MethodInfo info = base_type.script_type->get_method_info(method);
+					r_arghint = _make_arguments_hint(info, p_argidx);
+					_add_argument_name_options(info, p_argidx, r_result);
 					return;
 				}
 				Ref<Script> base_script = base_type.script_type->get_base_script();
@@ -3166,6 +3200,7 @@ static void _list_call_arguments(GDScriptParser::CompletionContext &p_context, c
 					}
 
 					r_arghint = _make_arguments_hint(info, p_argidx);
+					_add_argument_name_options(info, p_argidx, r_result);
 				}
 
 				if (p_argidx == 1 && p_call && ClassDB::is_parent_class(class_name, SNAME("Tween")) && method == SNAME("tween_property")) {
@@ -3446,6 +3481,7 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 					}
 					if (E.name == call->function_name) {
 						r_arghint += _make_arguments_hint(E, p_argidx);
+						_add_argument_name_options(E, p_argidx, r_result);
 						return;
 					}
 				}
@@ -3470,10 +3506,12 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 	} else if (Variant::has_utility_function(call->function_name)) {
 		MethodInfo info = Variant::get_utility_function_info(call->function_name);
 		r_arghint = _make_arguments_hint(info, p_argidx);
+		_add_argument_name_options(info, p_argidx, r_result);
 		return;
 	} else if (GDScriptUtilityFunctions::function_exists(call->function_name)) {
 		MethodInfo info = GDScriptUtilityFunctions::get_function_info(call->function_name);
 		r_arghint = _make_arguments_hint(info, p_argidx);
+		_add_argument_name_options(info, p_argidx, r_result);
 		return;
 	} else if (GDScriptParser::get_builtin_type(call->function_name) < Variant::VARIANT_MAX) {
 		// Complete constructor.
@@ -3489,6 +3527,7 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 				r_arghint += "\n";
 			}
 			r_arghint += _make_arguments_hint(E, p_argidx);
+			_add_argument_name_options(E, p_argidx, r_result);
 			i++;
 		}
 		return;
