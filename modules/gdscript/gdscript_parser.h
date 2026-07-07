@@ -926,6 +926,7 @@ public:
 		bool is_final = false;
 		bool is_static = false; // For lambdas it's determined in the analyzer.
 		bool is_private = false;
+		bool has_explicit_access_modifier = false;
 		bool is_coroutine = false;
 
 		// If this function is known to override a function in the parent type.
@@ -1381,6 +1382,7 @@ public:
 		int assignments = 0;
 		bool is_static = false;
 		bool is_private = false;
+		bool has_explicit_access_modifier = false;
 		bool is_immutable = false;
 		bool readonly = false;
 #ifdef TOOLS_ENABLED
@@ -1523,6 +1525,7 @@ private:
 	bool lambda_ended = false; // Marker for when a lambda ends, to apply an end of statement if needed.
 	bool pending_function_is_final = false;
 	bool pending_variable_is_readonly = false;
+	bool pending_member_has_access_modifier = false;
 
 	typedef bool (GDScriptParser::*AnnotationAction)(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	struct AnnotationInfo {

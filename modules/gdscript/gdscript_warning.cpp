@@ -176,6 +176,12 @@ String GDScriptWarning::get_message() const {
 		case IMPLICIT_FUNCTION_OVERRIDE:
 			CHECK_SYMBOLS(2);
 			return vformat(R"*(The method "%s()" overrides "%s.%s()" but does not have the "override" keyword.)*", symbols[0], symbols[1], symbols[0]);
+		case MISSING_ACCESS_MODIFIER:
+			CHECK_SYMBOLS(2);
+			if (symbols[0] == "Function") {
+				return vformat(R"*(The function "%s()" does not declare an explicit access modifier ("public" or "private").)*", symbols[1]);
+			}
+			return vformat(R"(The class variable "%s" does not declare an explicit access modifier ("public" or "private").)", symbols[1]);
 #ifndef DISABLE_DEPRECATED
 		// Never produced. These warnings migrated from 3.x by mistake.
 		case PROPERTY_USED_AS_FUNCTION: // There is already an error.
@@ -256,6 +262,7 @@ String GDScriptWarning::get_name_from_code(Code p_code) {
 		PNAME("ONREADY_WITH_EXPORT"),
 		PNAME("UNUSED_STATIC_OVERRIDING_TRAIT"),
 		PNAME("IMPLICIT_FUNCTION_OVERRIDE"),
+		PNAME("MISSING_ACCESS_MODIFIER"),
 #ifndef DISABLE_DEPRECATED
 		"PROPERTY_USED_AS_FUNCTION",
 		"CONSTANT_USED_AS_FUNCTION",

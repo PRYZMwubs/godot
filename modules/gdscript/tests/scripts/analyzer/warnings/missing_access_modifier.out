@@ -1,0 +1,3 @@
+GDTEST_OK
+~~ WARNING at line 1: (MISSING_ACCESS_MODIFIER) The class variable "no_modifier" does not declare an explicit access modifier ("public" or "private").
+~~ WARNING at line 7: (MISSING_ACCESS_MODIFIER) The function "no_modifier_func()" does not declare an explicit access modifier ("public" or "private").

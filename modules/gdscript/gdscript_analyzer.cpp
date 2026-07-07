@@ -1546,11 +1546,27 @@ void GDScriptAnalyzer::resolve_class_body(GDScriptParser::ClassNode *p_class, co
 		}
 	}
 
+	bool class_uses_explicit_access_modifier = false;
+	for (int i = 0; i < p_class->members.size(); i++) {
+		const GDScriptParser::ClassNode::Member &member = p_class->members[i];
+		if (member.type == GDScriptParser::ClassNode::Member::VARIABLE && member.variable->has_explicit_access_modifier) {
+			class_uses_explicit_access_modifier = true;
+			break;
+		}
+		if (member.type == GDScriptParser::ClassNode::Member::FUNCTION && member.function->has_explicit_access_modifier) {
+			class_uses_explicit_access_modifier = true;
+			break;
+		}
+	}
+
 	// Check unused variables and datatypes of property getters and setters.
 	for (int i = 0; i < p_class->members.size(); i++) {
 		GDScriptParser::ClassNode::Member member = p_class->members[i];
 		if (member.type == GDScriptParser::ClassNode::Member::VARIABLE) {
 #ifdef DEBUG_ENABLED
+			if (class_uses_explicit_access_modifier && !member.variable->has_explicit_access_modifier) {
+				parser->push_warning(member.variable->identifier, GDScriptWarning::MISSING_ACCESS_MODIFIER, "Variable", member.variable->identifier->name);
+			}
 			if (member.variable->usages == 0 && (String(member.variable->identifier->name).begins_with("_") || member.variable->is_private)) {
 				parser->push_warning(member.variable->identifier, GDScriptWarning::UNUSED_PRIVATE_CLASS_VARIABLE, member.variable->identifier->name);
 			}
@@ -1624,6 +1640,12 @@ void GDScriptAnalyzer::resolve_class_body(GDScriptParser::ClassNode *p_class, co
 					}
 				}
 			}
+		} else if (member.type == GDScriptParser::ClassNode::Member::FUNCTION) {
+#ifdef DEBUG_ENABLED
+			if (class_uses_explicit_access_modifier && !member.function->has_explicit_access_modifier) {
+				parser->push_warning(member.function->identifier, GDScriptWarning::MISSING_ACCESS_MODIFIER, "Function", member.function->identifier->name);
+			}
+#endif // DEBUG_ENABLED
 		} else if (member.type == GDScriptParser::ClassNode::Member::SIGNAL) {
 #ifdef DEBUG_ENABLED
 			if (member.signal->usages == 0 && p_class->type != GDScriptParser::Node::TRAIT) {

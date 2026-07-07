@@ -1418,6 +1418,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 	bool class_end = false;
 	bool next_is_static = false;
 	bool next_is_private = false;
+	bool next_has_access_modifier = false;
 	bool next_is_override = false;
 	bool next_is_final = false;
 	bool next_is_readonly = false;
@@ -1439,6 +1440,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				advance();
 				next_is_private = true;
+				next_has_access_modifier = true;
 			} break;
 			case GDScriptTokenizer::Token::PUBLIC: {
 				if (next_is_override) {
@@ -1455,6 +1457,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				advance();
 				next_is_private = false;
+				next_has_access_modifier = true;
 			} break;
 			case GDScriptTokenizer::Token::OVERRIDE: {
 				advance();
@@ -1487,8 +1490,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					next_is_final = false;
 				}
 				pending_variable_is_readonly = next_is_readonly;
+				pending_member_has_access_modifier = next_has_access_modifier;
 				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
 				pending_variable_is_readonly = false;
+				pending_member_has_access_modifier = false;
 				next_is_readonly = false;
 				if (next_is_static) {
 					current_class->has_static_data = true;
@@ -1507,7 +1512,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
 					next_is_readonly = false;
 				}
+				pending_member_has_access_modifier = next_has_access_modifier;
 				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_immutable_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				pending_member_has_access_modifier = false;
 				if (next_is_static) {
 					current_class->has_static_data = true;
 				}
@@ -1551,8 +1558,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					next_is_readonly = false;
 				}
 				pending_function_is_final = next_is_final;
+				pending_member_has_access_modifier = next_has_access_modifier;
 				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_private, next_is_override);
 				pending_function_is_final = false;
+				pending_member_has_access_modifier = false;
 				next_is_override = false;
 				next_is_final = false;
 				break;
@@ -1710,6 +1719,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 		}
 		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_private = false;
+			next_has_access_modifier = false;
 		}
 		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_final = false;
@@ -1755,6 +1765,7 @@ GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, b
 	variable->export_info.name = variable->identifier->name;
 	variable->is_static = p_is_static;
 	variable->is_private = p_is_private;
+	variable->has_explicit_access_modifier = pending_member_has_access_modifier;
 	variable->is_immutable = p_is_immutable;
 	variable->readonly = pending_variable_is_readonly;
 
@@ -2360,6 +2371,7 @@ GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static, b
 	FunctionNode *function = alloc_node<FunctionNode>();
 	function->is_static = p_is_static;
 	function->is_private = p_is_private;
+	function->has_explicit_access_modifier = pending_member_has_access_modifier;
 	function->is_marked_as_override = p_is_override;
 	function->is_final = pending_function_is_final;
 	if (function->is_static && function->is_final) {

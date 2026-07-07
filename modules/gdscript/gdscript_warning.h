@@ -94,6 +94,7 @@ public:
 		ONREADY_WITH_EXPORT, // The `@onready` annotation will set the value after `@export` which is likely not intended.
 		UNUSED_STATIC_OVERRIDING_TRAIT, // Overridden static without using "static" keyword.
 		IMPLICIT_FUNCTION_OVERRIDE, // A function overrides a function in a parent class, but does not have the `override` keyword.
+		MISSING_ACCESS_MODIFIER, // Class variable/function does not explicitly declare access visibility.
 #ifndef DISABLE_DEPRECATED
 		PROPERTY_USED_AS_FUNCTION, // Function not found, but there's a property with the same name.
 		CONSTANT_USED_AS_FUNCTION, // Function not found, but there's a constant with the same name.
@@ -155,6 +156,7 @@ public:
 		ERROR, // ONREADY_WITH_EXPORT // May not work as expected.
 		WARN, // UNUSED_STATIC_OVERRIDING_TRAIT
 		WARN, // IMPLICIT_FUNCTION_OVERRIDE
+		WARN, // MISSING_ACCESS_MODIFIER
 #ifndef DISABLE_DEPRECATED
 		WARN, // PROPERTY_USED_AS_FUNCTION
 		WARN, // CONSTANT_USED_AS_FUNCTION

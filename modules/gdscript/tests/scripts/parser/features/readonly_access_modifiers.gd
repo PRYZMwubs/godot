@@ -2,7 +2,7 @@ class A:
 	public readonly var a: int = 1
 	private readonly var b: int = 2
 
-	func get_b() -> int:
+	public func get_b() -> int:
 		return b
 
 func test() -> void:
