@@ -974,10 +974,8 @@ static ScriptLanguage::CodeCompletionOption _calculate_string_insertion(const GD
 	}
 
 	option.text_edit.new_text = final_code;
-	option.text_edit.start_line = existing_literal->start_line;
-	option.text_edit.start_column = existing_literal->start_column;
-	option.text_edit.end_line = existing_literal->end_line;
-	option.text_edit.end_column = existing_literal->end_column;
+	option.text_edit.start = { existing_literal->start_line, existing_literal->start_column };
+	option.text_edit.end = { existing_literal->end_line, existing_literal->end_column };
 
 	return option;
 }
@@ -1723,7 +1721,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 
 	static const char *_keywords_with_space[] = {
 		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "is", "func", "signal", "await",
-		"const", "enum", "static", "var", "let", "if", "elif", "else", "for", "match", "when", "while", "private", "public", "struct",
+		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "public", "override", "struct",
 		nullptr
 	};
 
@@ -3550,6 +3548,85 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 	r_forced = r_result.size() > 0;
 }
 
+/**
+ * Generates additional edits for GDScript completions of category `COMPLETION_OVERRIDE_METHOD`.
+ * These edits will automatically apply the `override` keyword when using completion to generate an override.
+ * If the `override` keyword is already present, nothing will occur.
+ *
+ * @param ctx           The completion context
+ * @param code_by_line  A vector containing each line of text in the currently open file (split by \n).
+ */
+static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptParser::CompletionContext &ctx, const Vector<String> &code_by_line) {
+	int line = ctx.current_line - 1; // The ctx current line is one-indexed, but the code_by_line is zero-indexed.
+	// Backtrack in the current line and upwards a few lines to search for the override keyword.
+	// If we don't see it, inject `override` inline before the `func` keyword.
+	bool has_override_modifier = false;
+	int lines_traversed = 0;
+	int func_line = -1; // Generally speaking we expect the line with `func` to be the current line, but for sanity we'll search for it anyway.
+	int func_column = -1;
+
+	while (!has_override_modifier && lines_traversed < 10 && line >= 0) {
+		String text = code_by_line.get(line);
+		String stripped_text = text.strip_edges();
+
+		int found_func = text.find("func");
+		if (found_func != -1) {
+			if (func_line == -1) {
+				func_line = line;
+				func_column = found_func;
+
+				// If override already appears on the same declaration line before func, don't add it again.
+				String before_func = text.substr(0, found_func);
+				if (before_func.contains("override")) {
+					has_override_modifier = true;
+					break;
+				}
+			} else {
+				break; // We've hit another `func` decl. Anything in or above this line doesn't apply to this function anymore.
+			}
+		}
+
+		if (stripped_text == "override" || stripped_text.begins_with("override ")) {
+			has_override_modifier = true;
+			break;
+		}
+
+		line--;
+		lines_traversed++;
+	}
+
+	if (!has_override_modifier && func_line != -1) {
+		String text = code_by_line.get(func_line);
+		ScriptLanguage::TextEdit edit;
+
+		int insert_column = text.length() - text.lstrip(" \t").length();
+		String declaration_start = text.substr(insert_column);
+		if (declaration_start.begins_with("public ")) {
+			insert_column += 7;
+		} else if (declaration_start.begins_with("private ")) {
+			insert_column += 8;
+		}
+
+		// Guard against malformed lines where `func` appears before the computed insertion point.
+		if (func_column != -1 && insert_column <= func_column) {
+			edit.start = { func_line, insert_column };
+			edit.end = { func_line, insert_column };
+			edit.new_text = "override ";
+			return { edit };
+		}
+
+		// Fallback: prepend before the first `func` token we found.
+		if (func_column != -1) {
+			edit.start = { func_line, func_column };
+			edit.end = { func_line, func_column };
+			edit.new_text = "override ";
+			return { edit };
+		}
+	}
+
+	return {};
+}
+
 ::Error GDScriptLanguage::complete_code(const String &p_code, const String &p_path, Object *p_owner, List<ScriptLanguage::CodeCompletionOption> *r_options, bool &r_forced, String &r_call_hint) {
 	const String quote_style = EDITOR_GET("text_editor/completion/use_single_quotes") ? "'" : "\"";
 
@@ -3833,6 +3910,7 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 			_find_call_arguments(completion_context, completion_context.node, completion_context.current_argument, options, r_forced, r_call_hint);
 		} break;
 		case GDScriptParser::COMPLETION_OVERRIDE_METHOD: {
+			Vector<String> code_by_line = p_code.split("\n");
 			GDScriptParser::DataType native_type = completion_context.current_class->base_type;
 			GDScriptParser::FunctionNode *function_node = static_cast<GDScriptParser::FunctionNode *>(completion_context.node);
 			bool is_static = function_node != nullptr && function_node->is_static;
@@ -3859,6 +3937,10 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 							String display_name = member.function->identifier->name;
 							display_name += member.function->signature + ":";
 							ScriptLanguage::CodeCompletionOption option(display_name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+
+							// When inserting a completion for a function override, we want to automatically add the override keyword to the completion.
+							option.additional_edits = get_override_text_edits(completion_context, code_by_line);
+
 							options.insert(member.function->identifier->name, option); // Insert name instead of display to track duplicates.
 						}
 						native_type = native_type.class_type->base_type;
@@ -3933,6 +4015,10 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 				method_hint += ":";
 
 				ScriptLanguage::CodeCompletionOption option(method_hint, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+
+				// When inserting a completion for a function override, we want to automatically add the override keyword to the completion.
+				option.additional_edits = get_override_text_edits(completion_context, code_by_line);
+
 				options.insert(option.display, option);
 			}
 		} break;

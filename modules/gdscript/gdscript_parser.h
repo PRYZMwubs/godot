@@ -801,6 +801,8 @@ public:
 		bool onready_used = false;
 		bool is_abstract = false;
 		bool is_private = false;
+		// If the class is final or not. Final classes must not be extended by another class.
+		bool is_final = false;
 		bool has_static_data = false;
 		bool annotated_static_unload = false;
 		String extends_path;
@@ -827,6 +829,10 @@ public:
 
 		StringName get_global_name() const {
 			return (outer == nullptr && identifier != nullptr) ? identifier->name : StringName();
+		}
+
+		StringName get_identifier_name() const {
+			return identifier != nullptr ? identifier->name : StringName();
 		}
 
 		Member get_member(const StringName &p_name) const {
@@ -916,9 +922,20 @@ public:
 		SuiteNode *body = nullptr;
 		bool is_bodyless = false; // Used for Traits with no body.
 		bool is_abstract = false;
+		// If the function is final or not. Final functions must not be overridden by a child class.
+		bool is_final = false;
 		bool is_static = false; // For lambdas it's determined in the analyzer.
 		bool is_private = false;
 		bool is_coroutine = false;
+
+		// If this function is known to override a function in the parent type.
+		// If a function is an override, but does not have the override keyword, a warning is raised.
+		// The value of this field is undefined unless resolved_signature is true.
+		bool is_override = false;
+
+		// If this function node has the override keyword. This does not indicate if the function is actually an override or not.
+		bool is_marked_as_override = false;
+
 		Variant rpc_config;
 		MethodInfo info;
 		LambdaNode *source_lambda = nullptr;
@@ -929,6 +946,7 @@ public:
 		String signature; // For autocompletion.
 #endif // TOOLS_ENABLED
 
+		// True if GDScriptAnalyzer::resolve_function_signature has been called for this function node.
 		bool resolved_signature = false;
 		bool resolved_body = false;
 
@@ -1421,6 +1439,7 @@ public:
 		FunctionNode *current_function = nullptr;
 		SuiteNode *current_suite = nullptr;
 		int current_line = -1;
+		int current_column = -1;
 		union {
 			int current_argument = -1;
 			int type_chain_index;
@@ -1501,6 +1520,7 @@ private:
 	List<CompletionCall> completion_call_stack;
 	bool in_lambda = false;
 	bool lambda_ended = false; // Marker for when a lambda ends, to apply an end of statement if needed.
+	bool pending_function_is_final = false;
 
 	typedef bool (GDScriptParser::*AnnotationAction)(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	struct AnnotationInfo {
@@ -1652,6 +1672,8 @@ private:
 	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool, bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static = false, bool p_is_private = false);
 	template <typename T>
+	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool, bool, bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_static = false, bool p_is_private = false, bool p_is_override = false);
+	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(bool), AnnotationInfo::TargetKind p_target, const String &p_member_kind, bool p_is_private = false);
 	template <typename T>
 	void parse_class_member(T *(GDScriptParser::*p_parse_function)(), AnnotationInfo::TargetKind p_target, const String &p_member_kind);
@@ -1660,7 +1682,7 @@ private:
 	StructNode *parse_struct(bool p_is_static, bool p_is_private);
 	EnumNode *parse_enum(bool p_is_static, bool p_is_private);
 	ParameterNode *parse_parameter();
-	FunctionNode *parse_function(bool p_is_static, bool p_is_private);
+	FunctionNode *parse_function(bool p_is_static, bool p_is_private, bool p_is_override = false);
 	bool parse_function_signature(FunctionNode *p_function, SuiteNode *p_body, const String &p_type, int p_signature_start);
 	SuiteNode *parse_suite(const String &p_context, SuiteNode *p_suite = nullptr, bool p_for_lambda = false);
 	// Annotations

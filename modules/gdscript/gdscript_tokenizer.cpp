@@ -110,6 +110,7 @@ static const char *token_names[] = {
 	"const", // TK_CONST,
 	"enum", // ENUM,
 	"extends", // EXTENDS,
+	"final", // FINAL,
 	"func", // FUNC,
 	"in", // TK_IN,
 	"is", // IS,
@@ -120,6 +121,7 @@ static const char *token_names[] = {
 	"signal", // SIGNAL,
 	"static", // STATIC,
 	"struct", // STRUCT,
+	"override", // OVERRIDE,
 	"super", // SUPER,
 	"trait", // TRAIT,
 	"trait_name", // TRAIT_NAME,
@@ -238,6 +240,7 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case ELSE:
 		case ENUM:
 		case EXTENDS:
+		case FINAL:
 		case FOR:
 		case FUNC:
 		case IF:
@@ -254,6 +257,7 @@ bool GDScriptTokenizer::Token::is_node_name() const {
 		case SIGNAL:
 		case STATIC:
 		case STRUCT:
+		case OVERRIDE:
 		case SUPER:
 		case TRAIT:
 		case TRAIT_NAME:
@@ -512,6 +516,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("enum", Token::ENUM) \
 	KEYWORD("extends", Token::EXTENDS) \
 	KEYWORD_GROUP('f') \
+	KEYWORD("final", Token::FINAL) \
 	KEYWORD("for", Token::FOR) \
 	KEYWORD("func", Token::FUNC) \
 	KEYWORD_GROUP('i') \
@@ -526,6 +531,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD("namespace", Token::NAMESPACE) \
 	KEYWORD("not", Token::NOT) \
 	KEYWORD_GROUP('o') \
+	KEYWORD("override", Token::OVERRIDE) \
 	KEYWORD("or", Token::OR) \
 	KEYWORD_GROUP('p') \
 	KEYWORD("pass", Token::PASS) \

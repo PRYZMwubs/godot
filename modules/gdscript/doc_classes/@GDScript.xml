@@ -74,6 +74,24 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="final">
+			<return type="void" />
+			<description>
+				Marks the following class or function as final. A final class cannot be extended, and a final function cannot be overridden.
+				[codeblock]
+				final class_name A
+
+				class B extends A: # Error: The base class is marked as final and cannot be extended.
+					pass
+				[/codeblock]
+				[codeblock]
+				class Base:
+					final func my_method():
+						pass
+				[/codeblock]
+				[b]Note:[/b] [method final] is a keyword, not a function. So it cannot be accessed as a [Callable].
+			</description>
+		</method>
 		<method name="dict_to_inst" deprecated="Consider using [method JSON.to_native] or [method Object.get_property_list] instead.">
 			<return type="Object" />
 			<param index="0" name="dictionary" type="Dictionary" />
@@ -185,6 +203,23 @@
 				print(ord("🤖")) # Prints 129302
 				[/codeblock]
 				This is the inverse of [method char]. See also [method String.chr] and [method String.unicode_at].
+			</description>
+		</method>
+		<method name="override">
+			<return type="void" />
+			<description>
+				Marks the following function as an override. An override function must override a function defined in a parent class.
+				Functions that override parent functions but omit this keyword raise a warning.
+				[codeblock]
+				class Shape:
+					func draw():
+						pass
+
+				class Circle extends Shape:
+					override func draw():
+						print("Drawing a circle.")
+				[/codeblock]
+				[b]Note:[/b] [method override] is a keyword, not a function. So it cannot be accessed as a [Callable].
 			</description>
 		</method>
 		<method name="preload">
