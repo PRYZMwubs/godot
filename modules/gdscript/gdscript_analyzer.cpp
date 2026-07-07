@@ -1546,6 +1546,7 @@ void GDScriptAnalyzer::resolve_class_body(GDScriptParser::ClassNode *p_class, co
 		}
 	}
 
+#ifdef DEBUG_ENABLED
 	bool class_uses_explicit_access_modifier = false;
 	for (int i = 0; i < p_class->members.size(); i++) {
 		const GDScriptParser::ClassNode::Member &member = p_class->members[i];
@@ -1558,6 +1559,7 @@ void GDScriptAnalyzer::resolve_class_body(GDScriptParser::ClassNode *p_class, co
 			break;
 		}
 	}
+#endif // DEBUG_ENABLED
 
 	// Check unused variables and datatypes of property getters and setters.
 	for (int i = 0; i < p_class->members.size(); i++) {
