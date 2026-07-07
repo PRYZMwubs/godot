@@ -490,6 +490,18 @@ void GDScriptLanguage::get_public_functions(List<MethodInfo> *p_functions) const
 		mi.default_arguments.push_back(String());
 		p_functions->push_back(mi);
 	}
+	{
+		MethodInfo mi;
+		mi.name = "final";
+		mi.return_val.type = Variant::NIL;
+		p_functions->push_back(mi);
+	}
+	{
+		MethodInfo mi;
+		mi.name = "override";
+		mi.return_val.type = Variant::NIL;
+		p_functions->push_back(mi);
+	}
 }
 
 void GDScriptLanguage::get_public_constants(List<Pair<String, Variant>> *p_constants) const {
