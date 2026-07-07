@@ -125,6 +125,9 @@ jobs:
 
       - name: Setup dependencies
         run: |
+          # GitHub-hosted runners may ship Microsoft apt sources that intermittently
+          # return invalid signed metadata ("NOSPLIT"), breaking apt-get update.
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update
           sudo apt-get install libwayland-bin  # TODO: Figure out somehow how to embed this one.
           if [ "${{ matrix.proj-test }}" == "true" -o "${{ matrix.proj-export }}" == "true" ]; then
