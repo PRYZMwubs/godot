@@ -74,6 +74,13 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="dict_to_inst" deprecated="Consider using [method JSON.to_native] or [method Object.get_property_list] instead.">
+			<return type="Object" />
+			<param index="0" name="dictionary" type="Dictionary" />
+			<description>
+				Converts a [param dictionary] (created with [method inst_to_dict]) back to an Object instance. Can be useful for deserializing.
+			</description>
+		</method>
 		<method name="final">
 			<return type="void" />
 			<description>
@@ -90,13 +97,6 @@
 						pass
 				[/codeblock]
 				[b]Note:[/b] [method final] is a keyword, not a function. So it cannot be accessed as a [Callable].
-			</description>
-		</method>
-		<method name="dict_to_inst" deprecated="Consider using [method JSON.to_native] or [method Object.get_property_list] instead.">
-			<return type="Object" />
-			<param index="0" name="dictionary" type="Dictionary" />
-			<description>
-				Converts a [param dictionary] (created with [method inst_to_dict]) back to an Object instance. Can be useful for deserializing.
 			</description>
 		</method>
 		<method name="get_stack">
