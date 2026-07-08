@@ -5805,7 +5805,7 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 		if (p_subscript->base->type == GDScriptParser::Node::IDENTIFIER) {
 			const GDScriptParser::IdentifierNode *base_identifier = static_cast<const GDScriptParser::IdentifierNode *>(p_subscript->base);
 			base_identifier_name = base_identifier->name;
-			if (base_identifier->variable_source != nullptr && base_identifier->variable_source->datatype_specifier == nullptr && base_identifier->variable_source->initializer != nullptr) {
+			if (base_identifier->source == GDScriptParser::IdentifierNode::LOCAL_VARIABLE && base_identifier->variable_source != nullptr && base_identifier->variable_source->datatype_specifier == nullptr && base_identifier->variable_source->initializer != nullptr) {
 				const GDScriptParser::ExpressionNode *initializer = base_identifier->variable_source->initializer;
 				if (initializer->type == GDScriptParser::Node::GET_NODE) {
 					base_is_untyped_node_lookup = true;
@@ -5827,7 +5827,8 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 		if (p_subscript->base->is_constant && !base_type.is_meta_type) {
 			// GH-92534. If the base is a GDScript, use the analyzer instead.
 			bool base_is_gdscript = false;
-			if (p_subscript->base->reduced_value.get_type() == Variant::OBJECT) {
+			const Variant::Type base_value_type = p_subscript->base->reduced_value.get_type();
+			if (base_value_type == Variant::OBJECT) {
 				Ref<GDScript> gdscript = Object::cast_to<GDScript>(p_subscript->base->reduced_value.get_validated_object());
 				if (gdscript.is_valid()) {
 					base_is_gdscript = true;
@@ -5848,7 +5849,7 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 					}
 				}
 			}
-			if (!base_is_gdscript) {
+			if (!base_is_gdscript && base_value_type != Variant::OBJECT) {
 				if (base_type.kind == GDScriptParser::DataType::STRUCT) {
 					int field_idx = -1;
 					for (int i = 0; i < base_type.struct_type->members.size(); i++) {

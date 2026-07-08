@@ -459,22 +459,26 @@ void GDScriptTest::error_handler(void *p_this, const char *p_function, const cha
 	TestResult *result = data->result;
 
 	result->status = GDTEST_RUNTIME_ERROR;
+	const String error_message = p_error != nullptr ? String::utf8(p_error) : String();
+	const String explanation = p_explanation != nullptr ? String::utf8(p_explanation) : String();
 
 	String header = _error_handler_type_string(p_type);
 
 	// Only include the file, line, and function for script errors,
 	// otherwise the test outputs changes based on the platform/compiler.
 	if (p_type == ERR_HANDLER_SCRIPT) {
+		const String file = p_file != nullptr ? String::utf8(p_file) : "<unknown>";
+		const String function = p_function != nullptr ? String::utf8(p_function) : "<unknown>";
 		header += vformat(" at %s:%d on %s()",
-				String::utf8(p_file).trim_prefix(self->base_dir).replace_char('\\', '/'),
+				file.trim_prefix(self->base_dir).replace_char('\\', '/'),
 				p_line,
-				String::utf8(p_function));
+				function);
 	}
 
 	StringBuilder error_string;
-	error_string.append(vformat(">> %s: %s\n", header, String::utf8(p_error)));
-	if (strlen(p_explanation) > 0) {
-		error_string.append(vformat(">>   %s\n", String::utf8(p_explanation)));
+	error_string.append(vformat(">> %s: %s\n", header, error_message));
+	if (!explanation.is_empty()) {
+		error_string.append(vformat(">>   %s\n", explanation));
 	}
 
 	result->output += error_string.as_string();
@@ -661,13 +665,46 @@ GDScriptTest::TestResult GDScriptTest::execute_test_code(bool p_is_generating) {
 	}
 
 	// Create object instance for test.
-	Object *obj = ClassDB::instantiate(script->get_native()->get_name());
+	const Ref<GDScriptNativeClass> &native = script->get_native();
+	if (native.is_null()) {
+		enable_stdout();
+		result.status = GDTEST_LOAD_ERROR;
+		result.output = "";
+		result.passed = false;
+		remove_print_handler(&_print_handler);
+		remove_error_handler(&_error_handler);
+		ERR_FAIL_V_MSG(result, "\nCould not instantiate script without a native base: '" + source_file + "'");
+	}
+
+	Object *obj = ClassDB::instantiate(native->get_name());
+	if (obj == nullptr) {
+		enable_stdout();
+		result.status = GDTEST_LOAD_ERROR;
+		result.output = "";
+		result.passed = false;
+		remove_print_handler(&_print_handler);
+		remove_error_handler(&_error_handler);
+		ERR_FAIL_V_MSG(result, "\nCould not instantiate native base object for: '" + source_file + "'");
+	}
+
 	Ref<RefCounted> obj_ref;
 	if (obj->is_ref_counted()) {
 		obj_ref = Ref<RefCounted>(Object::cast_to<RefCounted>(obj));
 	}
 	obj->set_script(script);
 	GDScriptInstance *instance = static_cast<GDScriptInstance *>(obj->get_script_instance());
+	if (instance == nullptr) {
+		enable_stdout();
+		result.status = GDTEST_LOAD_ERROR;
+		result.output = "";
+		result.passed = false;
+		remove_print_handler(&_print_handler);
+		remove_error_handler(&_error_handler);
+		if (obj_ref.is_null()) {
+			memdelete(obj);
+		}
+		ERR_FAIL_V_MSG(result, "\nCould not create script instance for: '" + source_file + "'");
+	}
 
 	// Call test function.
 	Callable::CallError call_err;
