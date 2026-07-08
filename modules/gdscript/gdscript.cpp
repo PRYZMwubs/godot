@@ -900,7 +900,7 @@ Error GDScript::reload(bool p_keep_state) {
 #ifdef TOOLS_ENABLED
 	// Done after compilation because it needs the GDScript object's inner class GDScript objects,
 	// which are made by calling make_scripts() within compiler.compile() above.
-	if (Engine::get_singleton()->is_editor_hint()) {
+	if (Engine::get_singleton()->is_editor_hint() && !GDScriptTests::is_running_tests()) {
 		GDScriptDocGen::generate_docs(this, parser.get_tree());
 	}
 #endif

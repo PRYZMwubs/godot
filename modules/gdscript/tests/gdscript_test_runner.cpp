@@ -50,6 +50,12 @@
 
 namespace GDScriptTests {
 
+static bool running_tests = false;
+
+bool is_running_tests() {
+	return running_tests;
+}
+
 void init_autoloads() {
 	HashMap<StringName, ProjectSettings::AutoloadInfo> autoloads(ProjectSettings::get_singleton()->get_autoload_list());
 
@@ -138,6 +144,7 @@ GDScriptTestRunner::GDScriptTestRunner(const String &p_source_dir, bool p_init_l
 	do_init_languages = p_init_language;
 	print_filenames = p_print_filenames;
 	binary_tokens = p_use_binary_tokens;
+	running_tests = true;
 
 	source_dir = p_source_dir;
 	if (!source_dir.ends_with("/")) {
@@ -175,6 +182,7 @@ GDScriptTestRunner::~GDScriptTestRunner() {
 	if (do_init_languages) {
 		finish_language();
 	}
+	running_tests = false;
 }
 
 #ifndef DEBUG_ENABLED

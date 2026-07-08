@@ -38,6 +38,8 @@
 
 namespace GDScriptTests {
 
+bool is_running_tests();
+
 void init_autoloads();
 void init_language(const String &p_base_path);
 void finish_language();
