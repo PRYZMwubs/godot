@@ -4995,13 +4995,21 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 			if (!p_is_protected || can_access_protected_from_current_class(p_owner_class)) {
 				return false;
 			}
-			push_error(vformat(R"(Protected member "%s" can't be used outside of "%s".)", p_identifier->name, p_owner_class->fqcn), p_identifier);
+			const String owner_name = p_owner_class && p_owner_class->identifier ? String(p_owner_class->identifier->name) : String("owner class");
+			GDScriptParser::DataType resolved_type;
+			resolved_type.kind = GDScriptParser::DataType::VARIANT;
+			p_identifier->set_datatype(resolved_type);
+			push_error(vformat(R"(Protected member "%s" can't be used outside of "%s".)", p_identifier->name, owner_name), p_identifier);
 			return true;
 		}
 		if (can_access_private_from_current_class(p_owner_class)) {
 			return false;
 		}
-		push_error(vformat(R"(Private member "%s" can't be used outside of "%s".)", p_identifier->name, p_owner_class->fqcn), p_identifier);
+		const String owner_name = p_owner_class && p_owner_class->identifier ? String(p_owner_class->identifier->name) : String("owner class");
+		GDScriptParser::DataType resolved_type;
+		resolved_type.kind = GDScriptParser::DataType::VARIANT;
+		p_identifier->set_datatype(resolved_type);
+		push_error(vformat(R"(Private member "%s" can't be used outside of "%s".)", p_identifier->name, owner_name), p_identifier);
 		return true;
 	};
 

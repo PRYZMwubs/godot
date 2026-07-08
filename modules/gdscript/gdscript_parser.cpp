@@ -5015,7 +5015,6 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // FOR,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // WHILE,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // BREAK,
-		{ nullptr,							nullptr,											PREC_NONE }, // PROTECTED,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // CONTINUE,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // PASS,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // RETURN,
@@ -5050,7 +5049,8 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // VAR,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // TK_VOID,
 		{ &GDScriptParser::parse_yield,                     nullptr,                                      PREC_NONE }, // YIELD,
-		{ nullptr,											nullptr,										PREC_NONE }, // PRIVATE,
+		{ nullptr,                                          nullptr,                                        PREC_NONE }, // PROTECTED,
+		{ nullptr,                                          nullptr,                                        PREC_NONE }, // PRIVATE,
 		{ nullptr,											nullptr,										PREC_NONE }, // PUBLIC,
 		{ nullptr,										nullptr,										PREC_NONE }, // READONLY,
 		// Punctuation
