@@ -627,6 +627,8 @@ void GDScriptParser::synchronize() {
 		}
 
 		switch (current.type) {
+			case GDScriptTokenizer::Token::NAMESPACE:
+			case GDScriptTokenizer::Token::IMPORT:
 			case GDScriptTokenizer::Token::CLASS:
 			case GDScriptTokenizer::Token::TRAIT:
 			case GDScriptTokenizer::Token::FINAL:
@@ -772,7 +774,7 @@ void GDScriptParser::parse_program() {
 		}
 	}
 
-	if (current.type == GDScriptTokenizer::Token::TRAIT_NAME || current.type == GDScriptTokenizer::Token::CLASS_NAME || current.type == GDScriptTokenizer::Token::EXTENDS || current.type == GDScriptTokenizer::Token::FINAL) {
+	if (current.type == GDScriptTokenizer::Token::NAMESPACE || current.type == GDScriptTokenizer::Token::IMPORT || current.type == GDScriptTokenizer::Token::TRAIT_NAME || current.type == GDScriptTokenizer::Token::CLASS_NAME || current.type == GDScriptTokenizer::Token::EXTENDS || current.type == GDScriptTokenizer::Token::FINAL) {
 		// Set range of the class/trait to only start at extends or class_name or trait_name if present.
 		reset_extents(head, current);
 	}
@@ -780,6 +782,22 @@ void GDScriptParser::parse_program() {
 	while (can_have_class_or_extends) {
 		// Order here doesn't matter, but there should be only one of each at most.
 		switch (current.type) {
+			case GDScriptTokenizer::Token::NAMESPACE:
+				PUSH_PENDING_ANNOTATIONS_TO_HEAD;
+				advance();
+				if (!head->namespace_name.is_empty()) {
+					push_error(R"("namespace" can only be used once.)");
+				} else {
+					parse_namespace();
+					end_statement("namespace statement");
+				}
+				break;
+			case GDScriptTokenizer::Token::IMPORT:
+				PUSH_PENDING_ANNOTATIONS_TO_HEAD;
+				advance();
+				parse_import();
+				end_statement("import statement");
+				break;
 			case GDScriptTokenizer::Token::CLASS_NAME:
 				PUSH_PENDING_ANNOTATIONS_TO_HEAD;
 				advance();
@@ -1039,7 +1057,11 @@ GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static, bool p_
 void GDScriptParser::parse_class_name() {
 	if (consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected identifier for the global class name after "class_name".)")) {
 		current_class->identifier = parse_identifier();
-		current_class->fqcn = String(current_class->identifier->name);
+		if (current_class == head && !head->namespace_path.is_empty()) {
+			current_class->fqcn = head->namespace_path + "." + String(current_class->identifier->name);
+		} else {
+			current_class->fqcn = String(current_class->identifier->name);
+		}
 	}
 
 	if (script_path.begins_with("res://") && script_path.contains("::")) {
@@ -1055,6 +1077,56 @@ void GDScriptParser::parse_class_name() {
 	} else {
 		end_statement("class_name statement");
 	}
+}
+
+void GDScriptParser::parse_namespace() {
+	int chain_index = 0;
+	make_completion_context(COMPLETION_NAMESPACE_PATH, head, chain_index++);
+
+	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected namespace segment after "namespace".)")) {
+		return;
+	}
+
+	head->namespace_name.push_back(parse_identifier());
+
+	while (match(GDScriptTokenizer::Token::PERIOD)) {
+		make_completion_context(COMPLETION_NAMESPACE_PATH, head, chain_index++);
+		if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected namespace segment after ".".)")) {
+			return;
+		}
+		head->namespace_name.push_back(parse_identifier());
+	}
+
+	StringBuilder namespace_builder;
+	for (int i = 0; i < head->namespace_name.size(); i++) {
+		if (i > 0) {
+			namespace_builder.append(".");
+		}
+		namespace_builder.append(String(head->namespace_name[i]->name));
+	}
+	head->namespace_path = namespace_builder.as_string();
+}
+
+void GDScriptParser::parse_import() {
+	ImportNode import;
+	int chain_index = 0;
+	make_completion_context(COMPLETION_NAMESPACE_PATH, head, chain_index++);
+
+	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected namespace to import after "import".)")) {
+		return;
+	}
+
+	import.name.push_back(parse_identifier());
+
+	while (match(GDScriptTokenizer::Token::PERIOD)) {
+		make_completion_context(COMPLETION_NAMESPACE_PATH, head, chain_index++);
+		if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected namespace segment after ".".)")) {
+			return;
+		}
+		import.name.push_back(parse_identifier());
+	}
+
+	imports.push_back(import);
 }
 
 void GDScriptParser::parse_extends() {
@@ -5033,6 +5105,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // FINAL,
 		{ &GDScriptParser::parse_lambda,                    nullptr,                                        PREC_NONE }, // FUNC,
 		{ nullptr,                                          &GDScriptParser::parse_binary_operator,      	PREC_CONTENT_TEST }, // TK_IN,
+		{ nullptr,                                          nullptr,                                        PREC_NONE }, // IMPORT,
 		{ nullptr,                                          &GDScriptParser::parse_type_test,            	PREC_TYPE_TEST }, // IS,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // LET,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // NAMESPACE,

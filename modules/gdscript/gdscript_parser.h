@@ -77,6 +77,7 @@ public:
 	struct FunctionNode;
 	struct GetNodeNode;
 	struct IdentifierNode;
+	struct ImportNode;
 	struct IfNode;
 	struct LambdaNode;
 	struct LiteralNode;
@@ -809,6 +810,8 @@ public:
 		bool annotated_static_unload = false;
 		String extends_path;
 		Vector<IdentifierNode *> extends; // List for indexing: extends A.B.C
+		String namespace_path;
+		Vector<IdentifierNode *> namespace_name; // List for indexing: namespace A.B.C
 		DataType base_type;
 		String fqcn; // Fully-qualified class name. Identifies uniquely any class in the project.
 		// Used Traits.
@@ -1363,6 +1366,10 @@ public:
 		}
 	};
 
+	struct ImportNode {
+		Vector<IdentifierNode *> name; // List for indexing namespace import: import A.B.C
+	};
+
 	struct VariableNode : public AssignableNode {
 		enum PropertyStyle {
 			PROP_NONE,
@@ -1422,6 +1429,7 @@ public:
 		COMPLETION_GET_NODE, // Get node with $ notation.
 		COMPLETION_IDENTIFIER, // List available identifiers in scope.
 		COMPLETION_INHERIT_TYPE, // Type after extends. Exclude non-viable types (built-ins, enums, void). Includes subtypes using the argument index.
+		COMPLETION_NAMESPACE_PATH, // Namespace path (after namespace/import). Includes segments using the argument index.
 		COMPLETION_USES_TYPE, // Type after uses.Includes traits and sub-traits using the argument index.
 		COMPLETION_METHOD, // List available methods in scope.
 		COMPLETION_OVERRIDE_METHOD, // Override implementation, also for native virtuals.
@@ -1477,6 +1485,7 @@ private:
 	HashMap<String, Ref<GDScriptParserRef>> depended_parsers;
 
 	ClassNode *head = nullptr;
+	Vector<ImportNode> imports;
 	Node *list = nullptr;
 	List<ParserError> errors;
 
@@ -1678,6 +1687,8 @@ private:
 	void parse_program();
 	ClassNode *parse_class(bool p_is_static, bool p_is_private);
 	void parse_class_name();
+	void parse_namespace();
+	void parse_import();
 	void parse_extends();
 	void parse_uses();
 	void parse_class_body(bool p_is_multiline);
@@ -1778,6 +1789,7 @@ public:
 	Error parse(const String &p_source_code, const String &p_script_path, bool p_for_completion, bool p_parse_body = true);
 	Error parse_binary(const Vector<uint8_t> &p_binary, const String &p_script_path);
 	ClassNode *get_tree() const { return head; }
+	const Vector<ImportNode> &get_imports() const { return imports; }
 	bool is_tool() const { return _is_tool; }
 	bool is_file_trait() const { return _is_trait_file; }
 	Ref<GDScriptParserRef> get_depended_parser_for(const String &p_path);

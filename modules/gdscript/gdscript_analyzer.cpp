@@ -82,6 +82,105 @@ static MethodInfo info_from_utility_func(const StringName &p_function) {
 	return info;
 }
 
+StringName GDScriptAnalyzer::resolve_global_class_name(const StringName &p_class_name) const {
+	if (p_class_name == StringName()) {
+		return StringName();
+	}
+
+	if (ScriptServer::is_global_class(p_class_name)) {
+		return p_class_name;
+	}
+
+	if (parser == nullptr || parser->head == nullptr) {
+		return StringName();
+	}
+
+	const String class_name = p_class_name;
+	if (class_name.contains(".")) {
+		return StringName();
+	}
+
+	if (!parser->head->namespace_path.is_empty()) {
+		const String namespaced_name = parser->head->namespace_path + "." + class_name;
+		if (ScriptServer::is_global_class(namespaced_name)) {
+			return namespaced_name;
+		}
+	}
+
+	for (const GDScriptParser::ImportNode &import_node : parser->get_imports()) {
+		if (import_node.name.is_empty()) {
+			continue;
+		}
+
+		String import_path;
+		for (int i = 0; i < import_node.name.size(); i++) {
+			if (i > 0) {
+				import_path += ".";
+			}
+			import_path += String(import_node.name[i]->name);
+		}
+
+		const String imported_name = import_path + "." + class_name;
+		if (ScriptServer::is_global_class(imported_name)) {
+			return imported_name;
+		}
+	}
+
+	return StringName();
+}
+
+bool GDScriptAnalyzer::has_namespace(const String &p_namespace_path) const {
+	if (p_namespace_path.is_empty()) {
+		return false;
+	}
+
+	if (parser != nullptr && parser->head != nullptr && parser->head->namespace_path == p_namespace_path) {
+		return true;
+	}
+
+	LocalVector<StringName> global_classes;
+	ScriptServer::get_global_class_list(global_classes);
+	for (const StringName &global_class : global_classes) {
+		Vector<String> segments = String(global_class).split(".");
+		if (segments.size() <= 1) {
+			continue;
+		}
+
+		String prefix;
+		for (int i = 0; i < segments.size() - 1; i++) {
+			if (i > 0) {
+				prefix += ".";
+			}
+			prefix += segments[i];
+			if (prefix == p_namespace_path) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+void GDScriptAnalyzer::validate_imports() {
+	for (const GDScriptParser::ImportNode &import_node : parser->get_imports()) {
+		if (import_node.name.is_empty()) {
+			continue;
+		}
+
+		String import_path;
+		for (int i = 0; i < import_node.name.size(); i++) {
+			if (i > 0) {
+				import_path += ".";
+			}
+			import_path += String(import_node.name[i]->name);
+		}
+
+		if (ScriptServer::is_global_class(import_path) && !has_namespace(import_path)) {
+			push_error(vformat(R"(Imported name "%s" is a class, not a namespace.)", import_path), import_node.name[import_node.name.size() - 1]);
+		}
+	}
+}
+
 static GDScriptParser::DataType make_callable_type(const MethodInfo &p_info) {
 	GDScriptParser::DataType type;
 	type.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
@@ -395,11 +494,16 @@ Error GDScriptAnalyzer::resolve_class_inheritance(GDScriptParser::ClassNode *p_c
 
 	if (p_class->identifier) {
 		StringName class_name = p_class->identifier->name;
+		StringName global_name = class_name;
+		if (p_class == parser->head && !parser->head->namespace_path.is_empty()) {
+			global_name = parser->head->namespace_path + "." + String(class_name);
+		}
+
 		if (GDScriptParser::get_builtin_type(class_name) < Variant::VARIANT_MAX) {
 			push_error(vformat(R"(Class "%s" hides a built-in type.)", class_name), p_class->identifier);
 		} else if (class_exists(class_name)) {
 			push_error(vformat(R"(Class "%s" hides a native class.)", class_name), p_class->identifier);
-		} else if (ScriptServer::is_global_class(class_name) && (!GDScript::is_canonically_equal_paths(ScriptServer::get_global_class_path(class_name), parser->script_path) || p_class != parser->head)) {
+		} else if (ScriptServer::is_global_class(global_name) && (!GDScript::is_canonically_equal_paths(ScriptServer::get_global_class_path(global_name), parser->script_path) || p_class != parser->head)) {
 			push_error(vformat(R"(Class "%s" hides a global script class.)", class_name), p_class->identifier);
 		} else if (ProjectSettings::get_singleton()->has_autoload(class_name) && ProjectSettings::get_singleton()->get_autoload(class_name).is_singleton) {
 			push_error(vformat(R"(Class "%s" hides an autoload singleton.)", class_name), p_class->identifier);
@@ -471,21 +575,22 @@ Error GDScriptAnalyzer::resolve_class_inheritance(GDScriptParser::ClassNode *p_c
 			const StringName &name = id->name;
 			base.type_source = GDScriptParser::DataType::ANNOTATED_EXPLICIT;
 
-			if (ScriptServer::is_global_class(name)) {
-				String base_path = ScriptServer::get_global_class_path(name);
+			StringName resolved_name = resolve_global_class_name(name);
+			if (!resolved_name.is_empty()) {
+				String base_path = ScriptServer::get_global_class_path(resolved_name);
 
 				if (GDScript::is_canonically_equal_paths(base_path, parser->script_path)) {
 					base = parser->head->get_datatype();
 				} else {
 					Ref<GDScriptParserRef> base_parser = parser->get_depended_parser_for(base_path);
 					if (base_parser.is_null()) {
-						push_error(vformat(R"(Could not resolve super class "%s".)", name), id);
+						push_error(vformat(R"(Could not resolve super class "%s".)", resolved_name), id);
 						return ERR_PARSE_ERROR;
 					}
 
 					Error err = base_parser->raise_status(GDScriptParserRef::INHERITANCE_SOLVED);
 					if (err != OK) {
-						push_error(vformat(R"(Could not resolve super class inheritance from "%s".)", name), id);
+						push_error(vformat(R"(Could not resolve super class inheritance from "%s".)", resolved_name), id);
 						return err;
 					}
 
@@ -840,119 +945,122 @@ GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::Type
 			result.kind = GDScriptParser::DataType::NATIVE;
 			result.builtin_type = Variant::OBJECT;
 			result.native_type = first;
-		} else if (ScriptServer::is_global_class(first)) {
-			if (GDScript::is_canonically_equal_paths(parser->script_path, ScriptServer::get_global_class_path(first))) {
-				result = parser->head->get_datatype();
-			} else {
-				String path = ScriptServer::get_global_class_path(first);
-				String ext = path.get_extension();
-				if (ext == GDScriptLanguage::get_singleton()->get_extension()) {
-					Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(path);
-					if (ref.is_null() || ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
-						push_error(vformat(R"(Could not parse global class "%s" from "%s".)", first, ScriptServer::get_global_class_path(first)), p_type);
-						return bad_type;
-					}
-					result = ref->get_parser()->head->get_datatype();
+		} else {
+			StringName resolved_first = resolve_global_class_name(first);
+			if (!resolved_first.is_empty()) {
+				if (GDScript::is_canonically_equal_paths(parser->script_path, ScriptServer::get_global_class_path(resolved_first))) {
+					result = parser->head->get_datatype();
 				} else {
-					result = make_script_meta_type(ResourceLoader::load(path, "Script"));
+					String path = ScriptServer::get_global_class_path(resolved_first);
+					String ext = path.get_extension();
+					if (ext == GDScriptLanguage::get_singleton()->get_extension()) {
+						Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(path);
+						if (ref.is_null() || ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
+							push_error(vformat(R"(Could not parse global class "%s" from "%s".)", resolved_first, ScriptServer::get_global_class_path(resolved_first)), p_type);
+							return bad_type;
+						}
+						result = ref->get_parser()->head->get_datatype();
+					} else {
+						result = make_script_meta_type(ResourceLoader::load(path, "Script"));
+					}
 				}
-			}
-		} else if (ProjectSettings::get_singleton()->has_autoload(first) && ProjectSettings::get_singleton()->get_autoload(first).is_singleton) {
-			const ProjectSettings::AutoloadInfo &autoload = ProjectSettings::get_singleton()->get_autoload(first);
-			String script_path;
-			if (ResourceLoader::get_resource_type(autoload.path) == "PackedScene") {
-				// Try to get script from scene if possible.
-				if (GDScriptLanguage::get_singleton()->has_any_global_constant(autoload.name)) {
-					Variant constant = GDScriptLanguage::get_singleton()->get_any_global_constant(autoload.name);
-					Node *node = Object::cast_to<Node>(constant);
-					if (node != nullptr) {
-						Ref<GDScript> scr = node->get_script();
-						if (scr.is_valid()) {
-							script_path = scr->get_script_path();
+			} else if (ProjectSettings::get_singleton()->has_autoload(first) && ProjectSettings::get_singleton()->get_autoload(first).is_singleton) {
+				const ProjectSettings::AutoloadInfo &autoload = ProjectSettings::get_singleton()->get_autoload(first);
+				String script_path;
+				if (ResourceLoader::get_resource_type(autoload.path) == "PackedScene") {
+					// Try to get script from scene if possible.
+					if (GDScriptLanguage::get_singleton()->has_any_global_constant(autoload.name)) {
+						Variant constant = GDScriptLanguage::get_singleton()->get_any_global_constant(autoload.name);
+						Node *node = Object::cast_to<Node>(constant);
+						if (node != nullptr) {
+							Ref<GDScript> scr = node->get_script();
+							if (scr.is_valid()) {
+								script_path = scr->get_script_path();
+							}
 						}
 					}
+				} else if (ResourceLoader::get_resource_type(autoload.path) == "GDScript" || ResourceLoader::get_resource_type(autoload.path) == "GDScriptTrait") {
+					script_path = autoload.path;
 				}
-			} else if (ResourceLoader::get_resource_type(autoload.path) == "GDScript" || ResourceLoader::get_resource_type(autoload.path) == "GDScriptTrait") {
-				script_path = autoload.path;
-			}
-			if (script_path.is_empty()) {
-				return bad_type;
-			}
-			Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(script_path);
-			if (ref.is_null()) {
-				push_error(vformat(R"(The referenced autoload "%s" (from "%s") could not be loaded.)", first, script_path), p_type);
-				return bad_type;
-			}
-			if (ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
-				push_error(vformat(R"(Could not parse singleton "%s" from "%s".)", first, script_path), p_type);
-				return bad_type;
-			}
-			result = ref->get_parser()->head->get_datatype();
-		} else if (ClassDB::has_enum(parser->current_class->base_type.native_type, first)) {
-			// Native enum in current class.
-			result = make_native_enum_type(first, parser->current_class->base_type.native_type);
-		} else if (CoreConstants::is_global_enum(first)) {
-			if (p_type->type_chain.size() > 1) {
-				push_error(R"(Enums cannot contain nested types.)", p_type->type_chain[1]);
-				return bad_type;
-			}
-			result = make_global_enum_type(first, StringName());
-		} else {
-			// Classes in current scope.
-			List<GDScriptParser::ClassNode *> script_classes;
-			bool found = false;
-			get_class_node_current_scope_classes(parser->current_class, &script_classes, p_type);
-			for (GDScriptParser::ClassNode *script_class : script_classes) {
-				if (found) {
-					break;
+				if (script_path.is_empty()) {
+					return bad_type;
 				}
+				Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(script_path);
+				if (ref.is_null()) {
+					push_error(vformat(R"(The referenced autoload "%s" (from "%s") could not be loaded.)", first, script_path), p_type);
+					return bad_type;
+				}
+				if (ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
+					push_error(vformat(R"(Could not parse singleton "%s" from "%s".)", first, script_path), p_type);
+					return bad_type;
+				}
+				result = ref->get_parser()->head->get_datatype();
+			} else if (ClassDB::has_enum(parser->current_class->base_type.native_type, first)) {
+				// Native enum in current class.
+				result = make_native_enum_type(first, parser->current_class->base_type.native_type);
+			} else if (CoreConstants::is_global_enum(first)) {
+				if (p_type->type_chain.size() > 1) {
+					push_error(R"(Enums cannot contain nested types.)", p_type->type_chain[1]);
+					return bad_type;
+				}
+				result = make_global_enum_type(first, StringName());
+			} else {
+				// Classes in current scope.
+				List<GDScriptParser::ClassNode *> script_classes;
+				bool found = false;
+				get_class_node_current_scope_classes(parser->current_class, &script_classes, p_type);
+				for (GDScriptParser::ClassNode *script_class : script_classes) {
+					if (found) {
+						break;
+					}
 
-				if (script_class->identifier && script_class->identifier->name == first) {
-					result = script_class->get_datatype();
-					break;
-				}
-				if (script_class->members_indices.has(first)) {
-					resolve_class_member(script_class, first, p_type);
+					if (script_class->identifier && script_class->identifier->name == first) {
+						result = script_class->get_datatype();
+						break;
+					}
+					if (script_class->members_indices.has(first)) {
+						resolve_class_member(script_class, first, p_type);
 
-					GDScriptParser::ClassNode::Member member = script_class->get_member(first);
-					switch (member.type) {
-						case GDScriptParser::ClassNode::Member::TRAIT:
-						case GDScriptParser::ClassNode::Member::CLASS:
-							result = member.get_datatype();
-							found = true;
-							break;
-						case GDScriptParser::ClassNode::Member::ENUM:
-							result = member.get_datatype();
-							found = true;
-							break;
-						case GDScriptParser::ClassNode::Member::STRUCT:
-							result = member.get_datatype();
-							found = true;
-							break;
-						case GDScriptParser::ClassNode::Member::CONSTANT:
-							if (member.get_datatype().is_meta_type) {
+						GDScriptParser::ClassNode::Member member = script_class->get_member(first);
+						switch (member.type) {
+							case GDScriptParser::ClassNode::Member::TRAIT:
+							case GDScriptParser::ClassNode::Member::CLASS:
 								result = member.get_datatype();
 								found = true;
 								break;
-							} else if (Ref<Script>(member.constant->initializer->reduced_value).is_valid()) {
-								Ref<GDScript> gdscript = member.constant->initializer->reduced_value;
-								if (gdscript.is_valid()) {
-									Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(gdscript->get_script_path());
-									if (ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
-										push_error(vformat(R"(Could not parse script from "%s".)", gdscript->get_script_path()), p_type);
-										return bad_type;
-									}
-									result = ref->get_parser()->head->get_datatype();
-								} else {
-									result = make_script_meta_type(member.constant->initializer->reduced_value);
-								}
+							case GDScriptParser::ClassNode::Member::ENUM:
+								result = member.get_datatype();
 								found = true;
 								break;
-							}
-							[[fallthrough]];
-						default:
-							push_error(vformat(R"("%s" is a %s but does not contain a type.)", first, member.get_type_name()), p_type);
-							return bad_type;
+							case GDScriptParser::ClassNode::Member::STRUCT:
+								result = member.get_datatype();
+								found = true;
+								break;
+							case GDScriptParser::ClassNode::Member::CONSTANT:
+								if (member.get_datatype().is_meta_type) {
+									result = member.get_datatype();
+									found = true;
+									break;
+								} else if (Ref<Script>(member.constant->initializer->reduced_value).is_valid()) {
+									Ref<GDScript> gdscript = member.constant->initializer->reduced_value;
+									if (gdscript.is_valid()) {
+										Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(gdscript->get_script_path());
+										if (ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
+											push_error(vformat(R"(Could not parse script from "%s".)", gdscript->get_script_path()), p_type);
+											return bad_type;
+										}
+										result = ref->get_parser()->head->get_datatype();
+									} else {
+										result = make_script_meta_type(member.constant->initializer->reduced_value);
+									}
+									found = true;
+									break;
+								}
+								[[fallthrough]];
+							default:
+								push_error(vformat(R"("%s" is a %s but does not contain a type.)", first, member.get_type_name()), p_type);
+								return bad_type;
+						}
 					}
 				}
 			}
@@ -1791,17 +1899,18 @@ void GDScriptAnalyzer::resolve_class_uses(GDScriptParser::ClassNode *p_class, co
 			const StringName &name = id->name;
 			trait_name = name;
 			trait_name_node = id;
-			if (ScriptServer::is_global_class(name)) {
-				String base_path = ScriptServer::get_global_class_path(name);
+			StringName resolved_name = resolve_global_class_name(name);
+			if (!resolved_name.is_empty()) {
+				String base_path = ScriptServer::get_global_class_path(resolved_name);
 				uses->path = base_path;
 				ext_parser_ref = parser->get_depended_parser_for(base_path);
 				if (ext_parser_ref.is_null()) {
-					push_error(vformat(R"(Could not resolve trait "%s".)", name), id);
+					push_error(vformat(R"(Could not resolve trait "%s".)", resolved_name), id);
 					continue;
 				}
 				Error err = ext_parser_ref->raise_status(GDScriptParserRef::BODY_SOLVED);
 				if (err) {
-					push_error(vformat(R"(Could not resolve trait's body from "%s".)", name), id);
+					push_error(vformat(R"(Could not resolve trait's body from "%s".)", resolved_name), id);
 					continue;
 				}
 				trait = ext_parser_ref->get_parser()->head;
@@ -5446,8 +5555,9 @@ void GDScriptAnalyzer::reduce_identifier(GDScriptParser::IdentifierNode *p_ident
 		return;
 	}
 
-	if (ScriptServer::is_global_class(name)) {
-		p_identifier->set_datatype(make_global_class_meta_type(name, p_identifier));
+	StringName resolved_name = resolve_global_class_name(name);
+	if (!resolved_name.is_empty()) {
+		p_identifier->set_datatype(make_global_class_meta_type(resolved_name, p_identifier));
 		return;
 	}
 
@@ -5780,9 +5890,10 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 
 			if (!found_access && base_identifier_name != StringName()) {
 				const String inferred_owner = String(base_identifier_name).to_pascal_case();
-				if (ScriptServer::is_global_class(inferred_owner)) {
-					owner_label = inferred_owner;
-					const String global_path = ScriptServer::get_global_class_path(inferred_owner);
+				StringName resolved_owner = resolve_global_class_name(inferred_owner);
+				if (!resolved_owner.is_empty()) {
+					owner_label = resolved_owner;
+					const String global_path = ScriptServer::get_global_class_path(resolved_owner);
 					Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(global_path);
 					if (ref.is_valid() && ref->raise_status(GDScriptParserRef::USES_SOLVED) == OK) {
 						inspect_parser(ref->get_parser());
@@ -6971,18 +7082,21 @@ GDScriptParser::DataType GDScriptAnalyzer::type_from_property_hint_string(const 
 		result.kind = GDScriptParser::DataType::NATIVE;
 		result.builtin_type = Variant::OBJECT;
 		result.native_type = p_type_name;
-	} else if (ScriptServer::is_global_class(p_type_name)) {
-		// Just load this as it shouldn't be a GDScript.
-		Ref<Script> script = ResourceLoader::load(ScriptServer::get_global_class_path(p_type_name));
-		result.kind = GDScriptParser::DataType::SCRIPT;
-		result.builtin_type = Variant::OBJECT;
-		result.native_type = script->get_instance_base_type();
-		result.script_type = script;
-	} else if (p_type_name == SNAME("Variant")) {
-		result.kind = GDScriptParser::DataType::VARIANT;
 	} else {
-		result.kind = GDScriptParser::DataType::VARIANT;
-		ERR_FAIL_V_MSG(result, "Could not find type from property hint string.");
+		StringName resolved_type_name = resolve_global_class_name(p_type_name);
+		if (!resolved_type_name.is_empty()) {
+			// Just load this as it shouldn't be a GDScript.
+			Ref<Script> script = ResourceLoader::load(ScriptServer::get_global_class_path(resolved_type_name));
+			result.kind = GDScriptParser::DataType::SCRIPT;
+			result.builtin_type = Variant::OBJECT;
+			result.native_type = script->get_instance_base_type();
+			result.script_type = script;
+		} else if (p_type_name == SNAME("Variant")) {
+			result.kind = GDScriptParser::DataType::VARIANT;
+		} else {
+			result.kind = GDScriptParser::DataType::VARIANT;
+			ERR_FAIL_V_MSG(result, "Could not find type from property hint string.");
+		}
 	}
 
 	return result;
@@ -6999,12 +7113,13 @@ GDScriptParser::DataType GDScriptAnalyzer::type_from_property(const PropertyInfo
 	}
 	result.builtin_type = p_property.type;
 	if (p_property.type == Variant::OBJECT) {
-		if (ScriptServer::is_global_class(p_property.class_name)) {
+		StringName resolved_class_name = resolve_global_class_name(p_property.class_name);
+		if (!resolved_class_name.is_empty()) {
 			result.kind = GDScriptParser::DataType::SCRIPT;
-			result.script_path = ScriptServer::get_global_class_path(p_property.class_name);
-			result.native_type = ScriptServer::get_global_class_native_base(p_property.class_name);
+			result.script_path = ScriptServer::get_global_class_path(resolved_class_name);
+			result.native_type = ScriptServer::get_global_class_native_base(resolved_class_name);
 
-			Ref<Script> scr = ResourceLoader::load(ScriptServer::get_global_class_path(p_property.class_name));
+			Ref<Script> scr = ResourceLoader::load(ScriptServer::get_global_class_path(resolved_class_name));
 			if (scr.is_valid()) {
 				result.script_type = scr;
 			}
@@ -8159,6 +8274,10 @@ Error GDScriptAnalyzer::resolve_dependencies() {
 
 Error GDScriptAnalyzer::analyze() {
 	parser->errors.clear();
+	validate_imports();
+	if (!parser->errors.is_empty()) {
+		return ERR_PARSE_ERROR;
+	}
 
 	Error err = resolve_inheritance();
 	if (err) {

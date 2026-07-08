@@ -118,6 +118,7 @@ public:
 			FINAL,
 			FUNC,
 			TK_IN, // Conflict with WinAPI.
+			IMPORT,
 			IS,
 			LET,
 			NAMESPACE,

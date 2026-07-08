@@ -95,6 +95,7 @@ private:
 	Color annotation_color;
 	Color string_name_color;
 	Color type_color;
+	Color user_type_color;
 
 	enum CommentMarkerLevel {
 		COMMENT_MARKER_CRITICAL,

@@ -59,6 +59,34 @@ Vector<String> GDScriptLanguage::get_comment_delimiters() const {
 	static const Vector<String> delimiters = { "#" };
 	return delimiters;
 }
+static void _list_available_namespaces(const GDScriptParser::CompletionContext &p_context, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
+	int namespace_segment = p_context.current_argument;
+	if (namespace_segment < 0) {
+		namespace_segment = 0;
+	}
+
+	HashMap<String, bool> seen;
+	LocalVector<StringName> global_classes;
+	ScriptServer::get_global_class_list(global_classes);
+	for (const StringName &class_name : global_classes) {
+		Vector<String> segments = String(class_name).split(".");
+		if (segments.size() <= 1) {
+			continue;
+		}
+		if (namespace_segment >= segments.size() - 1) {
+			continue;
+		}
+
+		const String &candidate = segments[namespace_segment];
+		if (seen.has(candidate)) {
+			continue;
+		}
+		seen.insert(candidate, true);
+
+		ScriptLanguage::CodeCompletionOption option(candidate, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_OTHER_USER_CODE);
+		r_result.insert(option.display, option);
+	}
+}
 
 Vector<String> GDScriptLanguage::get_doc_comment_delimiters() const {
 	static const Vector<String> delimiters = { "##" };
@@ -1763,7 +1791,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 	}
 
 	static const char *_keywords_with_space[] = {
-		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "is", "func", "signal", "await",
+		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "import", "namespace", "is", "func", "signal", "await",
 		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "protected", "public", "readonly", "override", "struct",
 		nullptr
 	};
@@ -3783,6 +3811,10 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 				ScriptLanguage::CodeCompletionOption option(E, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_OTHER_USER_CODE);
 				options.insert(option.display, option);
 			}
+			r_forced = true;
+		} break;
+		case GDScriptParser::COMPLETION_NAMESPACE_PATH: {
+			_list_available_namespaces(completion_context, options);
 			r_forced = true;
 		} break;
 		case GDScriptParser::COMPLETION_TYPE_NAME_OR_VOID: {

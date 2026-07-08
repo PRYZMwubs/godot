@@ -72,6 +72,7 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 	bool is_after_var_const_declaration = false;
 	bool expect_type = false;
 	bool expect_trait_name = false;
+	bool expect_namespace_name = false;
 
 	int in_declaration_params = 0; // The number of opened `(` after func/signal name.
 	int in_declaration_param_dicts = 0; // The number of opened `{` inside func params.
@@ -484,6 +485,8 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 					expect_trait_name = false;
 				}
 
+				expect_namespace_name = word == GDScriptTokenizer::get_token_name(GDScriptTokenizer::Token::NAMESPACE) || word == GDScriptTokenizer::get_token_name(GDScriptTokenizer::Token::IMPORT);
+
 				// Don't highlight `list` as a type in `for elem: Type in list`.
 				expect_type = false;
 			} else if (member_keywords.has(word)) {
@@ -607,6 +610,18 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 						expect_type = false;
 						break;
 				}
+			}
+
+			if (expect_namespace_name) {
+				switch (str[j]) {
+					case ' ':
+					case '\t':
+					case '.':
+						break;
+					default:
+						expect_namespace_name = false;
+						break;
+				}
 			} else {
 				if (j > 0 && str[j - 1] == '-' && str[j] == '>') {
 					expect_type = true;
@@ -705,6 +720,9 @@ Dictionary GDScriptSyntaxHighlighter::_get_line_syntax_highlighting_impl(int p_l
 		} else if (expect_trait_name) {
 			next_type = IDENTIFIER;
 			color = member_variable_color;
+		} else if (expect_namespace_name) {
+			next_type = IDENTIFIER;
+			color = user_type_color;
 		} else if (expect_type) {
 			next_type = TYPE;
 			color = type_color;
@@ -793,18 +811,18 @@ void GDScriptSyntaxHighlighter::_update_cache() {
 	}
 
 	/* User types. */
-	const Color usertype_color = EDITOR_GET("text_editor/theme/highlighting/user_type_color");
+	user_type_color = EDITOR_GET("text_editor/theme/highlighting/user_type_color");
 	LocalVector<StringName> global_classes;
 	ScriptServer::get_global_class_list(global_classes);
 	for (const StringName &class_name : global_classes) {
-		class_names[class_name] = usertype_color;
+		class_names[class_name] = user_type_color;
 	}
 
 	/* Autoloads. */
 	for (const KeyValue<StringName, ProjectSettings::AutoloadInfo> &E : ProjectSettings::get_singleton()->get_autoload_list()) {
 		const ProjectSettings::AutoloadInfo &info = E.value;
 		if (info.is_singleton) {
-			class_names[info.name] = usertype_color;
+			class_names[info.name] = user_type_color;
 		}
 	}
 
