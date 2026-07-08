@@ -3289,8 +3289,8 @@ GDScriptParser::MatchBranchNode *GDScriptParser::parse_match_branch() {
 		// Pattern guard.
 		// Create block for guard because it also needs to access the bound variables from patterns, and we don't want to add them to the outer scope.
 		branch->guard_body = alloc_node<SuiteNode>();
-		for (PatternNode *pattern : branch->patterns) {
-			for (const KeyValue<StringName, IdentifierNode *> &E : pattern->binds) {
+		if (branch->patterns.size() > 0) {
+			for (const KeyValue<StringName, IdentifierNode *> &E : branch->patterns[0]->binds) {
 				SuiteNode::Local local(E.value, current_function);
 				local.type = SuiteNode::Local::PATTERN_BIND;
 				branch->guard_body->add_local(local);
@@ -3328,8 +3328,8 @@ GDScriptParser::MatchBranchNode *GDScriptParser::parse_match_branch() {
 	}
 
 	SuiteNode *suite = alloc_node<SuiteNode>();
-	for (PatternNode *pattern : branch->patterns) {
-		for (const KeyValue<StringName, IdentifierNode *> &E : pattern->binds) {
+	if (branch->patterns.size() > 0) {
+		for (const KeyValue<StringName, IdentifierNode *> &E : branch->patterns[0]->binds) {
 			SuiteNode::Local local(E.value, current_function);
 			local.type = SuiteNode::Local::PATTERN_BIND;
 			suite->add_local(local);
