@@ -35,7 +35,6 @@
 #include "../gdscript_compiler.h"
 #include "../gdscript_parser.h"
 #include "../gdscript_tokenizer_buffer.h"
-#include "../gdscript_utility_functions.h"
 
 #include "core/config/project_settings.h"
 #include "core/core_globals.h"
@@ -136,8 +135,6 @@ void init_language(const String &p_base_path) {
 void finish_language() {
 	GDScriptLanguage::get_singleton()->finish();
 	ScriptServer::global_classes_clear();
-	GDScriptParser::cleanup();
-	GDScriptUtilityFunctions::unregister_functions();
 }
 
 StringName GDScriptTestRunner::test_function_name;
