@@ -846,6 +846,7 @@ GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::Type
 	const GDScriptParser::IdentifierNode *first_id = p_type->type_chain[0];
 	StringName first = first_id->name;
 	bool type_found = false;
+	bool resolved_full_qualified_global_type = false;
 
 	if (first_id->suite && first_id->suite->has_local(first)) {
 		const GDScriptParser::SuiteNode::Local &local = first_id->suite->get_local(first);
@@ -882,7 +883,40 @@ GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::Type
 	}
 
 	if (!type_found) {
-		if (first == SNAME("Variant")) {
+		if (p_type->type_chain.size() > 1) {
+			String qualified_name;
+			for (int i = 0; i < p_type->type_chain.size(); i++) {
+				if (i > 0) {
+					qualified_name += ".";
+				}
+				qualified_name += String(p_type->type_chain[i]->name);
+			}
+
+			StringName resolved_qualified_name = resolve_global_class_name(qualified_name);
+			if (!resolved_qualified_name.is_empty()) {
+				resolved_full_qualified_global_type = true;
+				if (GDScript::is_canonically_equal_paths(parser->script_path, ScriptServer::get_global_class_path(resolved_qualified_name))) {
+					result = parser->head->get_datatype();
+				} else {
+					String path = ScriptServer::get_global_class_path(resolved_qualified_name);
+					String ext = path.get_extension();
+					if (ext == GDScriptLanguage::get_singleton()->get_extension()) {
+						Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(path);
+						if (ref.is_null() || ref->raise_status(GDScriptParserRef::USES_SOLVED) != OK) {
+							push_error(vformat(R"(Could not parse global class "%s" from "%s".)", resolved_qualified_name, ScriptServer::get_global_class_path(resolved_qualified_name)), p_type);
+							return bad_type;
+						}
+						result = ref->get_parser()->head->get_datatype();
+					} else {
+						result = make_script_meta_type(ResourceLoader::load(path, "Script"));
+					}
+				}
+			}
+		}
+
+		if (resolved_full_qualified_global_type) {
+			// Fully-qualified global class path consumed the whole type chain.
+		} else if (first == SNAME("Variant")) {
 			if (p_type->type_chain.size() == 2) {
 				// May be nested enum.
 				const StringName enum_name = p_type->type_chain[1]->name;
@@ -1072,7 +1106,7 @@ GDScriptParser::DataType GDScriptAnalyzer::resolve_datatype(GDScriptParser::Type
 		return bad_type;
 	}
 
-	if (p_type->type_chain.size() > 1) {
+	if (!resolved_full_qualified_global_type && p_type->type_chain.size() > 1) {
 		if (result.kind == GDScriptParser::DataType::CLASS || result.kind == GDScriptParser::DataType::TRAIT) {
 			for (int i = 1; i < p_type->type_chain.size(); i++) {
 				GDScriptParser::DataType base = result;

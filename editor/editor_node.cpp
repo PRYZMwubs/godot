@@ -5909,11 +5909,21 @@ bool EditorNode::is_object_of_custom_type(const Object *p_object, const StringNa
 	}
 
 	if (scr.is_valid()) {
+		const String requested_type = String(p_class);
+		const bool requested_type_is_unqualified = requested_type.find(".") == -1;
+
 		Ref<Script> base_script = scr;
 		while (base_script.is_valid()) {
 			StringName name = EditorNode::get_editor_data().script_class_get_name(base_script->get_path());
 			if (name == p_class) {
 				return true;
+			}
+
+			if (requested_type_is_unqualified && !name.is_empty()) {
+				const String name_string = String(name);
+				if (name_string.get_slice(".", name_string.get_slice_count(".") - 1) == requested_type) {
+					return true;
+				}
 			}
 			base_script = base_script->get_base_script();
 		}

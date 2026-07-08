@@ -44,8 +44,20 @@ bool GDScriptDataType::is_type(const Variant &p_variant, bool p_allow_implicit_c
 			bool valid = builtin_type == var_type;
 			if (valid && builtin_type == Variant::ARRAY && has_container_element_type(0)) {
 				Array array = p_variant;
-				if (array.is_typed()) {
-					const GDScriptDataType &elem_type = container_element_types[0];
+				const GDScriptDataType &elem_type = container_element_types[0];
+				if (elem_type.kind == STRUCT) {
+					for (int i = 0; i < array.size(); i++) {
+						const Variant &element = array[i];
+						if (!elem_type.is_type(element)) {
+							valid = false;
+							break;
+						}
+						if (element.get_type() == Variant::ARRAY && !Array(element).is_struct()) {
+							valid = false;
+							break;
+						}
+					}
+				} else if (array.is_typed()) {
 					Variant::Type array_builtin_type = (Variant::Type)array.get_typed_builtin();
 					StringName array_native_type = array.get_typed_class_name();
 					Ref<Script> array_script_type_ref = array.get_typed_script();
@@ -167,7 +179,11 @@ bool GDScriptDataType::is_type(const Variant &p_variant, bool p_allow_implicit_c
 			if (p_variant.get_type() == Variant::NIL) {
 				return true;
 			}
-			return p_variant.get_type() == Variant::ARRAY;
+			if (p_variant.get_type() != Variant::ARRAY) {
+				return false;
+			}
+			Array array = p_variant;
+			return array.is_struct();
 		} break;
 	}
 	return false;
