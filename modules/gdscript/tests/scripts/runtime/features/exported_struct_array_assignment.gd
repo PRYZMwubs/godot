@@ -19,3 +19,4 @@ func test():
 	print(holder.struct_array[0].b)
 	print(holder.struct_array[1].a)
 	print(holder.struct_array[1].b)
+	holder.free()
