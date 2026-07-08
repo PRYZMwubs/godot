@@ -59,7 +59,7 @@ Vector<String> GDScriptLanguage::get_comment_delimiters() const {
 	static const Vector<String> delimiters = { "#" };
 	return delimiters;
 }
-static void _list_available_namespaces(const GDScriptParser::CompletionContext &p_context, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
+[[maybe_unused]] static void _list_available_namespaces(const GDScriptParser::CompletionContext &p_context, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
 	int namespace_segment = p_context.current_argument;
 	if (namespace_segment < 0) {
 		namespace_segment = 0;

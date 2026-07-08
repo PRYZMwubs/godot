@@ -1097,14 +1097,14 @@ void GDScriptParser::parse_namespace() {
 		head->namespace_name.push_back(parse_identifier());
 	}
 
-	StringBuilder namespace_builder;
+	String namespace_builder;
 	for (int i = 0; i < head->namespace_name.size(); i++) {
 		if (i > 0) {
-			namespace_builder.append(".");
+			namespace_builder += ".";
 		}
-		namespace_builder.append(String(head->namespace_name[i]->name));
+		namespace_builder += String(head->namespace_name[i]->name);
 	}
-	head->namespace_path = namespace_builder.as_string();
+	head->namespace_path = namespace_builder;
 }
 
 void GDScriptParser::parse_import() {
