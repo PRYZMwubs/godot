@@ -13,7 +13,7 @@ func test():
 	value.push_back(Holder.Data())
 	value.push_back(Holder.Data(9, false))
 
-	print(holder.set("struct_array", value))
+	holder.set("struct_array", value)
 	print(holder.struct_array.size())
 	print(holder.struct_array[0].a)
 	print(holder.struct_array[0].b)
