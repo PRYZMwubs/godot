@@ -93,6 +93,17 @@ class GDScript : public Script {
 		PropertyInfo property_info;
 	};
 
+	enum AccessModifier : uint8_t {
+		ACCESS_PUBLIC,
+		ACCESS_PROTECTED,
+		ACCESS_PRIVATE,
+	};
+
+	struct AccessInfo {
+		AccessModifier access = ACCESS_PUBLIC;
+		GDScript *owner = nullptr;
+	};
+
 	struct ClearData {
 		RBSet<GDScriptFunction *> functions;
 		RBSet<Ref<Script>> scripts;
@@ -128,6 +139,7 @@ class GDScript : public Script {
 	HashMap<StringName, Variant> constants;
 	HashMap<StringName, GDScriptFunction *> member_functions;
 	HashMap<StringName, Ref<GDScript>> subclasses;
+	HashMap<StringName, AccessInfo> member_access;
 	HashMap<StringName, MethodInfo> _signals;
 	Dictionary rpc_config;
 
@@ -385,6 +397,7 @@ class GDScriptInstance : public ScriptInstance {
 	HashMap<StringName, int> member_indices_cache; //used only for hot script reloading
 #endif
 	Vector<Variant> members;
+	bool _can_access_script_member(const StringName &p_name) const;
 
 	SelfList<GDScriptFunctionState>::List pending_func_states;
 
@@ -535,6 +548,12 @@ public:
 
 	_FORCE_INLINE_ void exit_function() {
 		if (!track_call_stack) {
+			if (unlikely(_call_stack_size == 0)) {
+				ERR_PRINT("Stack underflow! (Engine Bug)");
+				return;
+			}
+			_call_stack_size--;
+			_call_stack = _call_stack->prev;
 			return;
 		}
 

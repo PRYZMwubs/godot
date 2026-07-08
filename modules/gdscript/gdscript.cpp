@@ -2692,6 +2692,7 @@ Vector<String> GDScriptLanguage::get_reserved_words() const {
 		"func",
 		"namespace", // Reserved for potential future use.
 		"private",
+		"protected",
 		"public",
 		"readonly",
 		"signal",

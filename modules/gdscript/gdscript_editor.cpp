@@ -1264,13 +1264,17 @@ static void _find_identifiers_in_suite(const GDScriptParser::SuiteNode *p_suite,
 
 static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base, const GDScriptParser::ClassNode *p_from_class, bool p_only_functions, bool p_types_only, bool p_add_braces, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result, int p_recursion_depth);
 
-static bool _can_access_private_for_completion(const GDScriptParser::ClassNode *owner, const GDScriptParser::ClassNode *from) {
+static bool _can_access_protected_for_completion(const GDScriptParser::ClassNode *owner, const GDScriptParser::ClassNode *from) {
 	for (const GDScriptParser::ClassNode *c = from; c != nullptr; c = c->base_type.class_type) {
 		if (c == owner) {
 			return true;
 		}
 	}
 	return false;
+}
+
+static bool _can_access_private_for_completion(const GDScriptParser::ClassNode *owner, const GDScriptParser::ClassNode *from) {
+	return owner == from;
 }
 
 static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class, const GDScriptParser::ClassNode *p_from_class, bool p_only_functions, bool p_types_only, bool p_static, bool p_parent_only, bool p_add_braces, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result, int p_recursion_depth) {
@@ -1287,6 +1291,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 				ScriptLanguage::CodeCompletionOption option;
 				switch (member.type) {
 					case GDScriptParser::ClassNode::Member::VARIABLE:
+						if (member.variable->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.variable->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1296,6 +1303,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.variable->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_MEMBER, location);
 						break;
 					case GDScriptParser::ClassNode::Member::CONSTANT:
+						if (member.constant->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.constant->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1312,6 +1322,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						break;
 					case GDScriptParser::ClassNode::Member::TRAIT:
 					case GDScriptParser::ClassNode::Member::CLASS:
+						if (member.m_class->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.m_class->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1321,6 +1334,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.m_class->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, location);
 						break;
 					case GDScriptParser::ClassNode::Member::ENUM_VALUE:
+						if (member.enum_value.parent_enum->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.enum_value.parent_enum->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1330,6 +1346,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.enum_value.identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_CONSTANT, location);
 						break;
 					case GDScriptParser::ClassNode::Member::ENUM:
+						if (member.m_enum->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.m_enum->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1339,6 +1358,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.m_enum->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_ENUM, location);
 						break;
 					case GDScriptParser::ClassNode::Member::FUNCTION:
+						if (member.function->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.function->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1363,6 +1385,9 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.signal->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_SIGNAL, location);
 						break;
 					case GDScriptParser::ClassNode::Member::STRUCT:
+						if (member.m_struct->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
 						if (member.m_struct->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
 							continue;
 						}
@@ -1739,7 +1764,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 
 	static const char *_keywords_with_space[] = {
 		"and", "not", "or", "in", "as", "class", "class_name", "trait", "trait_name", "extends", "uses", "is", "func", "signal", "await",
-		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "public", "readonly", "override", "struct",
+		"const", "enum", "static", "var", "let", "if", "elif", "else", "final", "for", "match", "when", "while", "private", "protected", "public", "readonly", "override", "struct",
 		nullptr
 	};
 
@@ -3734,6 +3759,9 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 						continue;
 					}
 					if (!member.m_class || !member.m_class->identifier) {
+						continue;
+					}
+					if (member.m_class->is_protected && !_can_access_protected_for_completion(clss, completion_context.current_class)) {
 						continue;
 					}
 					if (member.m_class->is_private && !_can_access_private_for_completion(clss, completion_context.current_class)) {

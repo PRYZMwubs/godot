@@ -2807,6 +2807,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 	p_script->member_functions.clear();
 	p_script->member_indices.clear();
+	p_script->member_access.clear();
 	p_script->static_variables_indices.clear();
 	p_script->static_variables.clear();
 	p_script->_signals.clear();
@@ -2889,6 +2890,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 			p_script->base = base;
 			p_script->member_indices = base->member_indices;
+			p_script->member_access = base->member_access;
 		} break;
 		default: {
 			_set_error("Parser bug (please report): invalid inheritance.", nullptr);
@@ -2904,10 +2906,23 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 	for (int i = 0; i < p_class->members.size(); i++) {
 		const GDScriptParser::ClassNode::Member &member = p_class->members[i];
+		auto set_member_access = [&](const StringName &p_name, bool p_is_protected, bool p_is_private) {
+			GDScript::AccessInfo info;
+			info.owner = p_script;
+			if (p_is_private) {
+				info.access = GDScript::ACCESS_PRIVATE;
+			} else if (p_is_protected) {
+				info.access = GDScript::ACCESS_PROTECTED;
+			} else {
+				info.access = GDScript::ACCESS_PUBLIC;
+			}
+			p_script->member_access[p_name] = info;
+		};
 		switch (member.type) {
 			case GDScriptParser::ClassNode::Member::VARIABLE: {
 				const GDScriptParser::VariableNode *variable = member.variable;
 				StringName name = variable->identifier->name;
+				set_member_access(name, variable->is_protected, variable->is_private);
 
 				GDScript::MemberInfo minfo;
 				switch (variable->property) {
@@ -2993,6 +3008,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 			case GDScriptParser::ClassNode::Member::CONSTANT: {
 				const GDScriptParser::ConstantNode *constant = member.constant;
 				StringName name = constant->identifier->name;
+				set_member_access(name, constant->is_protected, constant->is_private);
 
 				p_script->constants.insert(name, constant->initializer->reduced_value);
 			} break;
@@ -3000,6 +3016,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 			case GDScriptParser::ClassNode::Member::ENUM_VALUE: {
 				const GDScriptParser::EnumNode::Value &enum_value = member.enum_value;
 				StringName name = enum_value.identifier->name;
+				set_member_access(name, enum_value.parent_enum->is_protected, enum_value.parent_enum->is_private);
 
 				p_script->constants.insert(name, enum_value.value);
 			} break;
@@ -3014,6 +3031,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 			case GDScriptParser::ClassNode::Member::ENUM: {
 				const GDScriptParser::EnumNode *enum_n = member.m_enum;
 				StringName name = enum_n->identifier->name;
+				set_member_access(name, enum_n->is_protected, enum_n->is_private);
 
 				p_script->constants.insert(name, enum_n->dictionary);
 			} break;
@@ -3021,6 +3039,7 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 			case GDScriptParser::ClassNode::Member::STRUCT: {
 				const GDScriptParser::StructNode *struct_node = member.m_struct;
 				StringName name = struct_node->identifier->name;
+				set_member_access(name, struct_node->is_protected, struct_node->is_private);
 				Ref<GDScriptStruct> struct_def = struct_node->struct_def_variant;
 				if (struct_def.is_null()) {
 					struct_def.instantiate();
@@ -3069,11 +3088,17 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 
 			case GDScriptParser::ClassNode::Member::FUNCTION: {
 				const GDScriptParser::FunctionNode *function_n = member.function;
+				set_member_access(function_n->identifier->name, function_n->is_protected, function_n->is_private);
 
 				Variant config = function_n->rpc_config;
 				if (config.get_type() != Variant::NIL) {
 					p_script->rpc_config[function_n->identifier->name] = config;
 				}
+			} break;
+			case GDScriptParser::ClassNode::Member::CLASS:
+			case GDScriptParser::ClassNode::Member::TRAIT: {
+				const GDScriptParser::ClassNode *class_n = member.m_class;
+				set_member_access(class_n->identifier->name, class_n->is_protected, class_n->is_private);
 			} break;
 			default:
 				break; // Nothing to do here.

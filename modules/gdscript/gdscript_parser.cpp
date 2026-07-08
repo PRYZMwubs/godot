@@ -966,7 +966,7 @@ bool GDScriptParser::has_class(const GDScriptParser::ClassNode *p_class) const {
 	return false;
 }
 
-GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static, bool p_is_private) {
+GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static, bool p_is_protected) {
 	ClassNode *n_class;
 	if (_is_trait) {
 		n_class = alloc_node<TraitNode>();
@@ -981,7 +981,8 @@ GDScriptParser::ClassNode *GDScriptParser::parse_class(bool p_is_static, bool p_
 	ClassNode *previous_class = current_class;
 	current_class = n_class;
 	n_class->outer = previous_class;
-	n_class->is_private = p_is_private;
+	n_class->is_protected = p_is_protected;
+	n_class->is_private = pending_member_is_private;
 	n_class->is_final = p_is_static;
 
 	if (consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected identifier for the class name after "class".)")) {
@@ -1417,6 +1418,7 @@ void GDScriptParser::parse_class_member(T *(GDScriptParser::*p_parse_function)()
 void GDScriptParser::parse_class_body(bool p_is_multiline) {
 	bool class_end = false;
 	bool next_is_static = false;
+	bool next_is_protected = false;
 	bool next_is_private = false;
 	bool next_has_access_modifier = false;
 	bool next_is_override = false;
@@ -1425,6 +1427,24 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 	while (!class_end && !is_at_end()) {
 		GDScriptTokenizer::Token token = current;
 		switch (token.type) {
+			case GDScriptTokenizer::Token::PROTECTED: {
+				if (next_is_override) {
+					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
+					next_is_override = false;
+				}
+				if (next_is_final) {
+					push_error(R"(The "final" keyword must come before the "func" or "class" keyword, after any access modifiers.)");
+					next_is_final = false;
+				}
+				if (next_is_readonly) {
+					push_error(R"(The "readonly" keyword must come before the "var" keyword, after any access modifiers.)");
+					next_is_readonly = false;
+				}
+				advance();
+				next_is_protected = true;
+				next_is_private = false;
+				next_has_access_modifier = true;
+			} break;
 			case GDScriptTokenizer::Token::PRIVATE: {
 				if (next_is_override) {
 					push_error(R"(The "override" keyword must come before the "func" keyword, after any access modifiers.)");
@@ -1439,6 +1459,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					next_is_readonly = false;
 				}
 				advance();
+				next_is_protected = false;
 				next_is_private = true;
 				next_has_access_modifier = true;
 			} break;
@@ -1456,6 +1477,7 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					next_is_readonly = false;
 				}
 				advance();
+				next_is_protected = false;
 				next_is_private = false;
 				next_has_access_modifier = true;
 			} break;
@@ -1490,9 +1512,11 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					next_is_final = false;
 				}
 				pending_variable_is_readonly = next_is_readonly;
+				pending_member_is_private = next_is_private;
 				pending_member_has_access_modifier = next_has_access_modifier;
-				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_protected);
 				pending_variable_is_readonly = false;
+				pending_member_is_private = false;
 				pending_member_has_access_modifier = false;
 				next_is_readonly = false;
 				if (next_is_static) {
@@ -1512,8 +1536,10 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
 					next_is_readonly = false;
 				}
+				pending_member_is_private = next_is_private;
 				pending_member_has_access_modifier = next_has_access_modifier;
-				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_immutable_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_private);
+				parse_class_member(static_cast<VariableNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_immutable_variable), AnnotationInfo::VARIABLE, "variable", next_is_static, next_is_protected);
+				pending_member_is_private = false;
 				pending_member_has_access_modifier = false;
 				if (next_is_static) {
 					current_class->has_static_data = true;
@@ -1532,7 +1558,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
 					next_is_readonly = false;
 				}
-				parse_class_member(static_cast<ConstantNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_constant), AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_private);
+				pending_member_is_private = next_is_private;
+				parse_class_member(static_cast<ConstantNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_constant), AnnotationInfo::CONSTANT, "constant", next_is_static, next_is_protected);
+				pending_member_is_private = false;
 				break;
 			case GDScriptTokenizer::Token::SIGNAL:
 				if (next_is_override) {
@@ -1547,6 +1575,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
 					next_is_readonly = false;
 				}
+				if (next_is_protected) {
+					push_error(R"(The "protected" keyword cannot be applied to "signal".)");
+				}
 				if (next_is_private) {
 					push_error(R"(The "private" keyword cannot be applied to "signal".)");
 				}
@@ -1558,9 +1589,11 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					next_is_readonly = false;
 				}
 				pending_function_is_final = next_is_final;
+				pending_member_is_private = next_is_private;
 				pending_member_has_access_modifier = next_has_access_modifier;
-				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_private, next_is_override);
+				parse_class_member(&GDScriptParser::parse_function, AnnotationInfo::FUNCTION, "function", next_is_static, next_is_protected, next_is_override);
 				pending_function_is_final = false;
+				pending_member_is_private = false;
 				pending_member_has_access_modifier = false;
 				next_is_override = false;
 				next_is_final = false;
@@ -1573,7 +1606,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				if (_is_trait) {
 					push_error(R"(class can not be a member of a trait.)");
 				}
-				parse_class_member(static_cast<ClassNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_class), AnnotationInfo::CLASS, "class", next_is_final, next_is_private);
+				pending_member_is_private = next_is_private;
+				parse_class_member(static_cast<ClassNode *(GDScriptParser::*)(bool, bool)>(&GDScriptParser::parse_class), AnnotationInfo::CLASS, "class", next_is_final, next_is_protected);
+				pending_member_is_private = false;
 				next_is_final = false;
 				break;
 			case GDScriptTokenizer::Token::TRAIT: {
@@ -1591,7 +1626,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				bool previous_parsing_trait = _is_trait;
 				_is_trait = true;
-				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::TRAIT, "trait", false, next_is_private);
+				pending_member_is_private = next_is_private;
+				parse_class_member(&GDScriptParser::parse_class, AnnotationInfo::TRAIT, "trait", false, next_is_protected);
+				pending_member_is_private = false;
 				_is_trait = previous_parsing_trait; // covers the case of a trait inside a trait.
 			} break;
 			case GDScriptTokenizer::Token::ENUM:
@@ -1607,7 +1644,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
 					next_is_readonly = false;
 				}
-				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum", false, next_is_private);
+				pending_member_is_private = next_is_private;
+				parse_class_member(&GDScriptParser::parse_enum, AnnotationInfo::NONE, "enum", false, next_is_protected);
+				pending_member_is_private = false;
 				break;
 			case GDScriptTokenizer::Token::STRUCT:
 				if (next_is_override) {
@@ -1622,7 +1661,9 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 					push_error(R"(The "readonly" keyword can only be used directly before a "var" declaration.)");
 					next_is_readonly = false;
 				}
-				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct", false, next_is_private);
+				pending_member_is_private = next_is_private;
+				parse_class_member(&GDScriptParser::parse_struct, AnnotationInfo::CLASS, "struct", false, next_is_protected);
+				pending_member_is_private = false;
 				break;
 			case GDScriptTokenizer::Token::STATIC: {
 				if (next_is_override) {
@@ -1714,20 +1755,21 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 				}
 				break;
 		}
-		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::PROTECTED && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_static = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::PROTECTED && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::STATIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+			next_is_protected = false;
 			next_is_private = false;
 			next_has_access_modifier = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::PROTECTED && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_final = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::OVERRIDE && token.type != GDScriptTokenizer::Token::PROTECTED && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::FINAL && token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::ANNOTATION && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_override = false;
 		}
-		if (token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::NEWLINE) {
+		if (token.type != GDScriptTokenizer::Token::READONLY && token.type != GDScriptTokenizer::Token::PROTECTED && token.type != GDScriptTokenizer::Token::PRIVATE && token.type != GDScriptTokenizer::Token::PUBLIC && token.type != GDScriptTokenizer::Token::NEWLINE) {
 			next_is_readonly = false;
 		}
 		if (panic_mode) {
@@ -1739,19 +1781,19 @@ void GDScriptParser::parse_class_body(bool p_is_multiline) {
 	}
 }
 
-GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_private) {
-	return parse_variable(p_is_static, p_is_private, true, false);
+GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_protected) {
+	return parse_variable(p_is_static, p_is_protected, true, false);
 }
 
-GDScriptParser::VariableNode *GDScriptParser::parse_immutable_variable(bool p_is_static, bool p_is_private) {
-	return parse_variable(p_is_static, p_is_private, false, true);
+GDScriptParser::VariableNode *GDScriptParser::parse_immutable_variable(bool p_is_static, bool p_is_protected) {
+	return parse_variable(p_is_static, p_is_protected, false, true);
 }
 
-GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_private, bool p_allow_property) {
-	return parse_variable(p_is_static, p_is_private, p_allow_property, false);
+GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_protected, bool p_allow_property) {
+	return parse_variable(p_is_static, p_is_protected, p_allow_property, false);
 }
 
-GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_private, bool p_allow_property, bool p_is_immutable) {
+GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, bool p_is_protected, bool p_allow_property, bool p_is_immutable) {
 	VariableNode *variable = alloc_node<VariableNode>();
 
 	make_completion_context(COMPLETION_DECLARATION, variable);
@@ -1764,7 +1806,8 @@ GDScriptParser::VariableNode *GDScriptParser::parse_variable(bool p_is_static, b
 	variable->identifier = parse_identifier();
 	variable->export_info.name = variable->identifier->name;
 	variable->is_static = p_is_static;
-	variable->is_private = p_is_private;
+	variable->is_protected = p_is_protected;
+	variable->is_private = pending_member_is_private;
 	variable->has_explicit_access_modifier = pending_member_has_access_modifier;
 	variable->is_immutable = p_is_immutable;
 	variable->readonly = pending_variable_is_readonly;
@@ -2007,7 +2050,7 @@ void GDScriptParser::parse_property_getter(VariableNode *p_variable) {
 	}
 }
 
-GDScriptParser::ConstantNode *GDScriptParser::parse_constant(bool p_is_static, bool p_is_private) {
+GDScriptParser::ConstantNode *GDScriptParser::parse_constant(bool p_is_static, bool p_is_protected) {
 	ConstantNode *constant = alloc_node<ConstantNode>();
 
 	make_completion_context(COMPLETION_DECLARATION, constant);
@@ -2018,7 +2061,8 @@ GDScriptParser::ConstantNode *GDScriptParser::parse_constant(bool p_is_static, b
 	}
 
 	constant->identifier = parse_identifier();
-	constant->is_private = p_is_private;
+	constant->is_protected = p_is_protected;
+	constant->is_private = pending_member_is_private;
 
 	if (match(GDScriptTokenizer::Token::COLON)) {
 		if (check((GDScriptTokenizer::Token::EQUAL))) {
@@ -2125,10 +2169,11 @@ GDScriptParser::SignalNode *GDScriptParser::parse_signal(bool p_is_static) {
 	return signal;
 }
 
-GDScriptParser::EnumNode *GDScriptParser::parse_enum(bool p_is_static, bool p_is_private) {
+GDScriptParser::EnumNode *GDScriptParser::parse_enum(bool p_is_static, bool p_is_protected) {
 	EnumNode *enum_node = alloc_node<EnumNode>();
 	bool named = false;
-	enum_node->is_private = p_is_private;
+	enum_node->is_protected = p_is_protected;
+	enum_node->is_private = pending_member_is_private;
 
 	make_completion_context(COMPLETION_DECLARATION, enum_node);
 
@@ -2226,10 +2271,11 @@ GDScriptParser::EnumNode *GDScriptParser::parse_enum(bool p_is_static, bool p_is
 	return enum_node;
 }
 
-GDScriptParser::StructNode *GDScriptParser::parse_struct(bool p_is_static, bool p_is_private) {
+GDScriptParser::StructNode *GDScriptParser::parse_struct(bool p_is_static, bool p_is_protected) {
 	StructNode *struct_node = alloc_node<StructNode>();
 
-	struct_node->is_private = p_is_private;
+	struct_node->is_protected = p_is_protected;
+	struct_node->is_private = pending_member_is_private;
 
 	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected identifier for the struct name after "struct".)")) {
 		complete_extents(struct_node);
@@ -2367,10 +2413,11 @@ bool GDScriptParser::parse_function_signature(FunctionNode *p_function, SuiteNod
 	return match(GDScriptTokenizer::Token::COLON);
 }
 
-GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static, bool p_is_private, bool p_is_override) {
+GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static, bool p_is_protected, bool p_is_override) {
 	FunctionNode *function = alloc_node<FunctionNode>();
 	function->is_static = p_is_static;
-	function->is_private = p_is_private;
+	function->is_protected = p_is_protected;
+	function->is_private = pending_member_is_private;
 	function->has_explicit_access_modifier = pending_member_has_access_modifier;
 	function->is_marked_as_override = p_is_override;
 	function->is_final = pending_function_is_final;
@@ -2665,29 +2712,37 @@ GDScriptParser::Node *GDScriptParser::parse_statement() {
 			complete_extents(result);
 			end_statement(R"("pass")");
 			break;
+		case GDScriptTokenizer::Token::PROTECTED:
 		case GDScriptTokenizer::Token::PRIVATE:
 		case GDScriptTokenizer::Token::PUBLIC: {
+			const bool is_protected = current.type == GDScriptTokenizer::Token::PROTECTED;
 			const bool is_private = current.type == GDScriptTokenizer::Token::PRIVATE;
-			const String modifier_name = current.get_name(); // "private"
+			const String modifier_name = current.get_name();
 			advance();
 
 			switch (current.type) {
 				case GDScriptTokenizer::Token::VAR:
 					advance();
-					// Local declaration: not static, private depends on modifier, no property syntax in local scope.
-					result = parse_variable(false, is_private, false);
+					// Local declaration: not static, no property syntax in local scope.
+					pending_member_is_private = is_private;
+					result = parse_variable(false, is_protected, false);
+					pending_member_is_private = false;
 					break;
 
 				case GDScriptTokenizer::Token::LET:
 					advance();
-					// Local immutable declaration: not static, private/public applies similarly to var.
-					result = parse_immutable_variable(false, is_private);
+					// Local immutable declaration: not static, modifier handling mirrors var.
+					pending_member_is_private = is_private;
+					result = parse_immutable_variable(false, is_protected);
+					pending_member_is_private = false;
 					break;
 
 				case GDScriptTokenizer::Token::TK_CONST:
 					advance();
-					// Local constant: not static, private depends on modifier.
-					result = parse_constant(false, is_private);
+					// Local constant: not static.
+					pending_member_is_private = is_private;
+					result = parse_constant(false, is_protected);
+					pending_member_is_private = false;
 					break;
 
 				default:
@@ -4960,6 +5015,7 @@ GDScriptParser::ParseRule *GDScriptParser::get_rule(GDScriptTokenizer::Token::Ty
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // FOR,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // WHILE,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // BREAK,
+		{ nullptr,							nullptr,											PREC_NONE }, // PROTECTED,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // CONTINUE,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // PASS,
 		{ nullptr,                                          nullptr,                                        PREC_NONE }, // RETURN,
@@ -5342,8 +5398,8 @@ bool GDScriptParser::export_annotations(AnnotationNode *p_annotation, Node *p_ta
 		push_error(vformat(R"(Annotation "%s" cannot be applied to a static variable.)", p_annotation->name), p_annotation);
 		return false;
 	}
-	if (variable->is_private) {
-		push_error(vformat(R"(Annotation "%s" cannot be applied to a private variable.)", p_annotation->name), p_annotation);
+	if (variable->is_protected || variable->is_private) {
+		push_error(vformat(R"(Annotation "%s" cannot be applied to a non-public variable.)", p_annotation->name), p_annotation);
 		return false;
 	}
 	if (variable->exported) {

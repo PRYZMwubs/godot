@@ -134,6 +134,7 @@ public:
 			VAR,
 			TK_VOID, // Conflict with WinAPI.
 			YIELD,
+			PROTECTED,
 			PRIVATE,
 			PUBLIC,
 			READONLY,

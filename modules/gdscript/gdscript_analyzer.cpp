@@ -4974,21 +4974,29 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 
 	bool is_constructor = base.is_meta_type && p_identifier->name == SNAME("new");
 
-	auto can_access_private_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
+	auto can_access_protected_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
 		if (p_owner_class == nullptr) {
 			return true;
 		}
 		for (const GDScriptParser::ClassNode *scope = parser->current_class; scope != nullptr; scope = scope->base_type.class_type) {
 			if (scope == p_owner_class) {
-				return true; // Same class or child class.
+				return true;
 			}
 		}
 		return false;
 	};
 
-	auto fail_if_private_not_accessible = [&](bool p_is_private, const GDScriptParser::ClassNode *p_owner_class) -> bool {
+	auto can_access_private_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
+		return p_owner_class == nullptr || parser->current_class == p_owner_class;
+	};
+
+	auto fail_if_member_not_accessible = [&](bool p_is_protected, bool p_is_private, const GDScriptParser::ClassNode *p_owner_class) -> bool {
 		if (!p_is_private) {
-			return false;
+			if (!p_is_protected || can_access_protected_from_current_class(p_owner_class)) {
+				return false;
+			}
+			push_error(vformat(R"(Protected member "%s" can't be used outside of "%s".)", p_identifier->name, p_owner_class->fqcn), p_identifier);
+			return true;
 		}
 		if (can_access_private_from_current_class(p_owner_class)) {
 			return false;
@@ -5020,7 +5028,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 			GDScriptParser::ClassNode::Member member = script_class->get_member(name);
 			switch (member.type) {
 				case GDScriptParser::ClassNode::Member::CONSTANT: {
-					if (fail_if_private_not_accessible(member.constant->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.constant->is_protected, member.constant->is_private, script_class)) {
 						return;
 					}
 					p_identifier->set_datatype(member.get_datatype());
@@ -5032,7 +5040,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::ENUM_VALUE: {
-					if (fail_if_private_not_accessible(member.enum_value.parent_enum->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.enum_value.parent_enum->is_protected, member.enum_value.parent_enum->is_private, script_class)) {
 						return;
 					}
 					p_identifier->set_datatype(member.get_datatype());
@@ -5043,7 +5051,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::ENUM: {
-					if (fail_if_private_not_accessible(member.m_enum->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.m_enum->is_protected, member.m_enum->is_private, script_class)) {
 						return;
 					}
 					p_identifier->set_datatype(member.get_datatype());
@@ -5054,7 +5062,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::VARIABLE: {
-					if (fail_if_private_not_accessible(member.variable->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.variable->is_protected, member.variable->is_private, script_class)) {
 						return;
 					}
 					if (is_base && (!base.is_meta_type || member.variable->is_static)) {
@@ -5077,7 +5085,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				} break;
 
 				case GDScriptParser::ClassNode::Member::FUNCTION: {
-					if (fail_if_private_not_accessible(member.function->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.function->is_protected, member.function->is_private, script_class)) {
 						return;
 					}
 					if (is_base && (!base.is_meta_type || member.function->is_static || is_constructor)) {
@@ -5090,7 +5098,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				} break;
 
 				case GDScriptParser::ClassNode::Member::TRAIT: {
-					if (fail_if_private_not_accessible(member.m_class->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.m_class->is_protected, member.m_class->is_private, script_class)) {
 						return;
 					}
 					reduce_identifier_from_base_set_class(p_identifier, member.get_datatype());
@@ -5099,7 +5107,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::CLASS: {
-					if (fail_if_private_not_accessible(member.m_class->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.m_class->is_protected, member.m_class->is_private, script_class)) {
 						return;
 					}
 					reduce_identifier_from_base_set_class(p_identifier, member.get_datatype());
@@ -5108,7 +5116,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				}
 
 				case GDScriptParser::ClassNode::Member::STRUCT: {
-					if (fail_if_private_not_accessible(member.m_struct->is_private, script_class)) {
+					if (fail_if_member_not_accessible(member.m_struct->is_protected, member.m_struct->is_private, script_class)) {
 						return;
 					}
 					p_identifier->set_datatype(member.get_datatype());
@@ -5672,6 +5680,133 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 		}
 
 		GDScriptParser::DataType base_type = p_subscript->base->get_datatype();
+		bool explicit_untyped_get_node_error = false;
+		bool base_is_untyped_node_lookup = false;
+		StringName base_identifier_name;
+		auto push_untyped_access_error = [&](const StringName &p_member_name) -> bool {
+			String access_label = "Protected";
+			String owner_label = "owner class";
+			bool found_access = false;
+
+			auto inspect_class_members = [&](auto &&self, const GDScriptParser::ClassNode *p_class) -> void {
+				if (p_class == nullptr || found_access) {
+					return;
+				}
+
+				for (int i = 0; i < p_class->members.size(); i++) {
+					const GDScriptParser::ClassNode::Member &member = p_class->members[i];
+					StringName candidate_name;
+					bool candidate_is_private = false;
+					bool candidate_is_protected = false;
+
+					switch (member.type) {
+						case GDScriptParser::ClassNode::Member::VARIABLE:
+							candidate_name = member.variable->identifier->name;
+							candidate_is_private = member.variable->is_private;
+							candidate_is_protected = member.variable->is_protected;
+							break;
+						case GDScriptParser::ClassNode::Member::CONSTANT:
+							candidate_name = member.constant->identifier->name;
+							candidate_is_private = member.constant->is_private;
+							candidate_is_protected = member.constant->is_protected;
+							break;
+						case GDScriptParser::ClassNode::Member::ENUM_VALUE:
+							candidate_name = member.enum_value.identifier->name;
+							candidate_is_private = member.enum_value.parent_enum->is_private;
+							candidate_is_protected = member.enum_value.parent_enum->is_protected;
+							break;
+						case GDScriptParser::ClassNode::Member::ENUM:
+							candidate_name = member.m_enum->identifier->name;
+							candidate_is_private = member.m_enum->is_private;
+							candidate_is_protected = member.m_enum->is_protected;
+							break;
+						case GDScriptParser::ClassNode::Member::FUNCTION:
+							candidate_name = member.function->identifier->name;
+							candidate_is_private = member.function->is_private;
+							candidate_is_protected = member.function->is_protected;
+							break;
+						case GDScriptParser::ClassNode::Member::CLASS:
+						case GDScriptParser::ClassNode::Member::TRAIT:
+							candidate_name = member.m_class->identifier->name;
+							candidate_is_private = member.m_class->is_private;
+							candidate_is_protected = member.m_class->is_protected;
+							break;
+						case GDScriptParser::ClassNode::Member::STRUCT:
+							candidate_name = member.m_struct->identifier->name;
+							candidate_is_private = member.m_struct->is_private;
+							candidate_is_protected = member.m_struct->is_protected;
+							break;
+						default:
+							break;
+					}
+
+					if (candidate_name == p_member_name && (candidate_is_private || candidate_is_protected)) {
+						access_label = candidate_is_private ? "Private" : "Protected";
+						owner_label = p_class->fqcn.is_empty() ? String(p_class->identifier ? p_class->identifier->name : StringName()) : p_class->fqcn;
+						if (owner_label.is_empty()) {
+							owner_label = "owner class";
+						}
+						found_access = true;
+						return;
+					}
+				}
+
+				for (int i = 0; i < p_class->members.size(); i++) {
+					const GDScriptParser::ClassNode::Member &member = p_class->members[i];
+					if (member.type == GDScriptParser::ClassNode::Member::CLASS || member.type == GDScriptParser::ClassNode::Member::TRAIT) {
+						self(self, member.m_class);
+						if (found_access) {
+							return;
+						}
+					}
+				}
+			};
+
+			auto inspect_parser = [&](GDScriptParser *p_parser) {
+				if (p_parser != nullptr) {
+					inspect_class_members(inspect_class_members, p_parser->head);
+				}
+			};
+
+			inspect_parser(parser);
+
+			if (!found_access && base_identifier_name != StringName()) {
+				const String inferred_owner = String(base_identifier_name).to_pascal_case();
+				if (ScriptServer::is_global_class(inferred_owner)) {
+					owner_label = inferred_owner;
+					const String global_path = ScriptServer::get_global_class_path(inferred_owner);
+					Ref<GDScriptParserRef> ref = parser->get_depended_parser_for(global_path);
+					if (ref.is_valid() && ref->raise_status(GDScriptParserRef::USES_SOLVED) == OK) {
+						inspect_parser(ref->get_parser());
+					}
+				}
+			}
+
+			if (!found_access) {
+				push_error(vformat(R"(Identifier "%s" not declared in the current scope.)", p_member_name), p_subscript->attribute);
+				return true;
+			}
+
+			if (owner_label == "owner class") {
+				push_error(vformat(R"(%s member "%s" can't be used outside of its owner class.)", access_label, p_member_name), p_subscript->attribute);
+			} else {
+				push_error(vformat(R"(%s member "%s" can't be used outside of "%s".)", access_label, p_member_name, owner_label), p_subscript->attribute);
+			}
+			return true;
+		};
+		if (p_subscript->base->type == GDScriptParser::Node::IDENTIFIER) {
+			const GDScriptParser::IdentifierNode *base_identifier = static_cast<const GDScriptParser::IdentifierNode *>(p_subscript->base);
+			base_identifier_name = base_identifier->name;
+			if (base_identifier->variable_source != nullptr && base_identifier->variable_source->datatype_specifier == nullptr && base_identifier->variable_source->initializer != nullptr) {
+				const GDScriptParser::ExpressionNode *initializer = base_identifier->variable_source->initializer;
+				if (initializer->type == GDScriptParser::Node::GET_NODE) {
+					base_is_untyped_node_lookup = true;
+				} else if (initializer->type == GDScriptParser::Node::CALL) {
+					const GDScriptParser::CallNode *call = static_cast<const GDScriptParser::CallNode *>(initializer);
+					base_is_untyped_node_lookup = call->function_name == SNAME("get_node");
+				}
+			}
+		}
 
 		if (base_type.is_constant && base_type.kind == GDScriptParser::DataType::TRAIT) {
 			push_error(vformat(R"*(Cannot access a trait's members directly; access through a class that uses it instead.)*"), p_subscript->attribute);
@@ -5746,9 +5881,12 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 		} else if (valid) {
 			// Do nothing.
 		} else if (base_type.is_variant() || !base_type.is_hard_type()) {
-			valid = !base_type.is_pseudo_type || p_can_be_pseudo_type;
 			result_type.kind = GDScriptParser::DataType::VARIANT;
-			if (base_type.is_variant() && base_type.is_hard_type() && base_type.is_meta_type && base_type.is_pseudo_type) {
+			if (base_is_untyped_node_lookup) {
+				explicit_untyped_get_node_error = push_untyped_access_error(p_subscript->attribute->name);
+				valid = false;
+				mark_node_unsafe(p_subscript);
+			} else if (base_type.is_variant() && base_type.is_hard_type() && base_type.is_meta_type && base_type.is_pseudo_type) {
 				// Special case: it may be a global enum with pseudo base (e.g. Variant.Type).
 				String enum_name;
 				if (p_subscript->base->type == GDScriptParser::Node::IDENTIFIER) {
@@ -5756,11 +5894,13 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 				}
 				if (CoreConstants::is_global_enum(enum_name)) {
 					result_type = make_global_enum_type(enum_name, StringName());
+					valid = true;
 				} else {
 					valid = false;
 					mark_node_unsafe(p_subscript);
 				}
 			} else {
+				valid = !base_type.is_pseudo_type || p_can_be_pseudo_type;
 				mark_node_unsafe(p_subscript);
 			}
 		} else {
@@ -5786,6 +5926,11 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 				}
 			} else if (!base_type.is_meta_type || !base_type.is_constant) {
 				valid = base_type.kind != GDScriptParser::DataType::BUILTIN;
+
+				if (valid && base_is_untyped_node_lookup) {
+					explicit_untyped_get_node_error = push_untyped_access_error(p_subscript->attribute->name);
+					valid = false;
+				}
 #ifdef DEBUG_ENABLED
 				if (valid) {
 					parser->push_warning(p_subscript, GDScriptWarning::UNSAFE_PROPERTY_ACCESS, p_subscript->attribute->name, base_type.to_string());
@@ -5798,7 +5943,9 @@ void GDScriptAnalyzer::reduce_subscript(GDScriptParser::SubscriptNode *p_subscri
 
 		if (!valid) {
 			GDScriptParser::DataType attr_type = p_subscript->attribute->get_datatype();
-			if (!p_can_be_pseudo_type && (attr_type.is_pseudo_type || result_type.is_pseudo_type)) {
+			if (explicit_untyped_get_node_error) {
+				// Specific error already emitted above for untyped get_node() member access.
+			} else if (!p_can_be_pseudo_type && (attr_type.is_pseudo_type || result_type.is_pseudo_type)) {
 				push_error(vformat(R"(Type "%s" in base "%s" cannot be used on its own.)", p_subscript->attribute->name, type_from_metatype(base_type).to_string()), p_subscript->attribute);
 			} else {
 				push_error(vformat(R"(Cannot find member "%s" in base "%s".)", p_subscript->attribute->name, type_from_metatype(base_type).to_string()), p_subscript->attribute);
@@ -6895,13 +7042,17 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 	}
 	StringName function_name = p_function;
 
-	auto can_access_private_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
+	auto can_access_protected_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
 		for (const GDScriptParser::ClassNode *scope = parser->current_class; scope != nullptr; scope = scope->base_type.class_type) {
 			if (scope == p_owner_class) {
-				return true; // same class or child class
+				return true;
 			}
 		}
 		return false;
+	};
+
+	auto can_access_private_from_current_class = [&](const GDScriptParser::ClassNode *p_owner_class) -> bool {
+		return parser->current_class == p_owner_class;
 	};
 
 	bool was_enum = false;
@@ -6985,6 +7136,10 @@ bool GDScriptAnalyzer::get_function_signature(GDScriptParser::Node *p_source, bo
 			GDScriptParser::FunctionNode *candidate = base_class->get_member(function_name).function;
 			if (candidate->is_private && !can_access_private_from_current_class(base_class)) {
 				push_error(vformat(R"(Private members can't be used outside of "%s".)", base_class->fqcn), p_source);
+				return false;
+			}
+			if (candidate->is_protected && !can_access_protected_from_current_class(base_class)) {
+				push_error(vformat(R"(Protected members can't be used outside of "%s".)", base_class->fqcn), p_source);
 				return false;
 			}
 			found_function = base_class->get_member(function_name).function;

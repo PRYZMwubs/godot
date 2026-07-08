@@ -577,6 +577,7 @@ public:
 			type = ENUM;
 		}
 
+		bool is_protected = false;
 		bool is_private = false;
 	};
 
@@ -800,6 +801,7 @@ public:
 		bool extends_used = false;
 		bool onready_used = false;
 		bool is_abstract = false;
+		bool is_protected = false;
 		bool is_private = false;
 		// If the class is final or not. Final classes must not be extended by another class.
 		bool is_final = false;
@@ -874,6 +876,7 @@ public:
 			type = CONSTANT;
 		}
 
+		bool is_protected = false;
 		bool is_private = false;
 	};
 
@@ -925,6 +928,7 @@ public:
 		// If the function is final or not. Final functions must not be overridden by a child class.
 		bool is_final = false;
 		bool is_static = false; // For lambdas it's determined in the analyzer.
+		bool is_protected = false;
 		bool is_private = false;
 		bool has_explicit_access_modifier = false;
 		bool is_coroutine = false;
@@ -1167,6 +1171,7 @@ public:
 
 		StructNode() { type = STRUCT; }
 
+		bool is_protected = false;
 		bool is_private = false;
 	};
 
@@ -1381,6 +1386,7 @@ public:
 		PropertyInfo export_info;
 		int assignments = 0;
 		bool is_static = false;
+		bool is_protected = false;
 		bool is_private = false;
 		bool has_explicit_access_modifier = false;
 		bool is_immutable = false;
@@ -1525,6 +1531,7 @@ private:
 	bool lambda_ended = false; // Marker for when a lambda ends, to apply an end of statement if needed.
 	bool pending_function_is_final = false;
 	bool pending_variable_is_readonly = false;
+	bool pending_member_is_private = false;
 	bool pending_member_has_access_modifier = false;
 
 	typedef bool (GDScriptParser::*AnnotationAction)(AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);

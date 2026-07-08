@@ -129,6 +129,7 @@ static const char *token_names[] = {
 	"var", // VAR,
 	"void", // TK_VOID,
 	"yield", // YIELD,
+	"protected", // PROTECTED,
 	"private", // PRIVATE,
 	"public", // PUBLIC,
 	"readonly", // READONLY,
@@ -538,6 +539,7 @@ GDScriptTokenizer::Token GDScriptTokenizerText::annotation() {
 	KEYWORD_GROUP('p') \
 	KEYWORD("pass", Token::PASS) \
 	KEYWORD("preload", Token::PRELOAD) \
+	KEYWORD("protected", Token::PROTECTED) \
 	KEYWORD("private", Token::PRIVATE) \
 	KEYWORD("public", Token::PUBLIC) \
 	KEYWORD_GROUP('r') \

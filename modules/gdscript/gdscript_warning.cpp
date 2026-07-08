@@ -94,7 +94,7 @@ String GDScriptWarning::get_message() const {
 			return vformat(R"(%s "%s" has an implicitly inferred static type.)", symbols[0], symbols[1]);
 		case UNSAFE_PROPERTY_ACCESS:
 			CHECK_SYMBOLS(2);
-			return vformat(R"(The property "%s" is not present on the inferred type "%s" (but may be present on a subtype).)", symbols[0], symbols[1]);
+			return vformat(R"(The property "%s" is not present on the inferred type "%s" (but may be present on a subtype). Add an explicit type annotation or cast to enable stricter static checks, including access modifiers.)", symbols[0], symbols[1]);
 		case UNSAFE_METHOD_ACCESS:
 			CHECK_SYMBOLS(2);
 			return vformat(R"*(The method "%s()" is not present on the inferred type "%s" (but may be present on a subtype).)*", symbols[0], symbols[1]);
@@ -179,9 +179,9 @@ String GDScriptWarning::get_message() const {
 		case MISSING_ACCESS_MODIFIER:
 			CHECK_SYMBOLS(2);
 			if (symbols[0] == "Function") {
-				return vformat(R"*(The function "%s()" does not declare an explicit access modifier ("public" or "private").)*", symbols[1]);
+				return vformat(R"*(The function "%s()" does not declare an explicit access modifier ("public", "protected", or "private").)*", symbols[1]);
 			}
-			return vformat(R"(The class variable "%s" does not declare an explicit access modifier ("public" or "private").)", symbols[1]);
+			return vformat(R"(The class variable "%s" does not declare an explicit access modifier ("public", "protected", or "private").)", symbols[1]);
 #ifndef DISABLE_DEPRECATED
 		// Never produced. These warnings migrated from 3.x by mistake.
 		case PROPERTY_USED_AS_FUNCTION: // There is already an error.
