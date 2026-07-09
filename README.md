@@ -17,7 +17,7 @@ Most of this fork is focused on making changes to GDScript to add new features -
 - Structs for GDScript - exporting and arrays supported.
 - Traits and Global Traits for GDScript.
 - (Optional) Override and Final keywords for functions, which are used to display warnings/errors when a function is used incorrectly.
-- (Optional) Public/Private/Protected keyword access modifiers for variables, constants, structs, traits, and classes - preventing private/protected members from being used outside their class (or outside their subclass in the case or protected members.)
+- (Optional) Public/Private/Protected keyword access modifiers for variables, constants, structs, traits, and classes - preventing private/protected members from being used outside their class (or outside their subclass in the case of protected members.)
 - Nested arrays/Dictionaries.
 - Immutable variables using the 'let' keyword.
 - Readonly keyword for variables.
