@@ -1426,6 +1426,18 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						}
 						break;
 					case GDScriptParser::ClassNode::Member::TRAIT:
+						if (member.m_class->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
+							continue;
+						}
+						if (member.m_class->is_private && !_can_access_private_for_completion(clss, p_from_class)) {
+							continue;
+						}
+						if (p_only_functions) {
+							_find_identifiers_in_class(member.m_class, p_from_class, p_only_functions, p_types_only, p_static, false, p_add_braces, r_result, p_recursion_depth + 1);
+							continue;
+						}
+						option = ScriptLanguage::CodeCompletionOption(member.m_class->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, location);
+						break;
 					case GDScriptParser::ClassNode::Member::CLASS:
 						if (member.m_class->is_protected && !_can_access_protected_for_completion(clss, p_from_class)) {
 							continue;
@@ -4055,10 +4067,62 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 			_find_call_arguments(completion_context, completion_context.node, completion_context.current_argument, options, r_forced, r_call_hint);
 		} break;
 		case GDScriptParser::COMPLETION_OVERRIDE_METHOD: {
+			r_forced = true;
 			Vector<String> code_by_line = p_code.split("\n");
 			GDScriptParser::DataType native_type = completion_context.current_class->base_type;
 			GDScriptParser::FunctionNode *function_node = static_cast<GDScriptParser::FunctionNode *>(completion_context.node);
 			bool is_static = function_node != nullptr && function_node->is_static;
+			Vector<ScriptLanguage::TextEdit> override_text_edits;
+			bool override_text_edits_ready = false;
+
+			auto get_override_edits_once = [&]() {
+				if (!override_text_edits_ready) {
+					override_text_edits = get_override_text_edits(completion_context, code_by_line);
+					override_text_edits_ready = true;
+				}
+				return override_text_edits;
+			};
+
+			auto should_skip_existing_function = [&](const StringName &p_name) {
+				if (!completion_context.current_class->has_function(p_name)) {
+					return false;
+				}
+				const GDScriptParser::ClassNode::Member &existing = completion_context.current_class->get_member(p_name);
+				if (existing.type != GDScriptParser::ClassNode::Member::FUNCTION) {
+					return false;
+				}
+				if (existing.function == function_node) {
+					return false;
+				}
+				// Trait-provided functions should still be offered as suggestions for explicit overrides.
+				return existing.function->trait_origin.is_empty();
+			};
+
+			for (const GDScriptParser::ClassNode::Member &member : completion_context.current_class->members) {
+				if (member.type != GDScriptParser::ClassNode::Member::FUNCTION) {
+					continue;
+				}
+				if (member.function->trait_origin.is_empty()) {
+					continue;
+				}
+				if (options.has(member.function->identifier->name)) {
+					continue;
+				}
+				if (should_skip_existing_function(member.get_name())) {
+					continue;
+				}
+				if (is_static != member.function->is_static) {
+					continue;
+				}
+
+				String display_name = member.function->identifier->name;
+				display_name += member.function->signature + ":";
+				ScriptLanguage::CodeCompletionOption option(display_name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+				// Trait functions are suggested here for convenience but are not true override targets.
+				// Do not auto-insert `override` for these completions.
+				options.insert(member.function->identifier->name, option);
+			}
+
 			while (native_type.is_set() && native_type.kind != GDScriptParser::DataType::NATIVE) {
 				switch (native_type.kind) {
 					case GDScriptParser::DataType::CLASS: {
@@ -4071,7 +4135,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 								continue;
 							}
 
-							if (completion_context.current_class->has_function(member.get_name()) && completion_context.current_class->get_member(member.get_name()).function != function_node) {
+							if (should_skip_existing_function(member.get_name())) {
 								continue;
 							}
 
@@ -4084,7 +4148,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 							ScriptLanguage::CodeCompletionOption option(display_name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
 
 							// When inserting a completion for a function override, we want to automatically add the override keyword to the completion.
-							option.additional_edits = get_override_text_edits(completion_context, code_by_line);
+							option.additional_edits = get_override_edits_once();
 
 							options.insert(member.function->identifier->name, option); // Insert name instead of display to track duplicates.
 						}
@@ -4122,7 +4186,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 				if (options.has(mi.name)) {
 					continue;
 				}
-				if (completion_context.current_class->has_function(mi.name) && completion_context.current_class->get_member(mi.name).function != function_node) {
+				if (should_skip_existing_function(mi.name)) {
 					continue;
 				}
 				String method_hint = mi.name;
@@ -4162,7 +4226,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 				ScriptLanguage::CodeCompletionOption option(method_hint, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
 
 				// When inserting a completion for a function override, we want to automatically add the override keyword to the completion.
-				option.additional_edits = get_override_text_edits(completion_context, code_by_line);
+				option.additional_edits = get_override_edits_once();
 
 				options.insert(option.display, option);
 			}
