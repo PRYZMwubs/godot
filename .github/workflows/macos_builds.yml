@@ -22,23 +22,27 @@ jobs:
           - name: Editor (target=editor)
             cache-name: macos-editor
             target: editor
+            module-suffix: ""
             bin: ./bin/godot.macos.editor.universal
 
           - name: Editor w/ Mono (target=editor)
             cache-name: macos-editor-mono
             target: editor
+            module-suffix: .mono
             scons-flags: module_mono_enabled=yes
             bin: ./bin/godot.macos.editor.mono.universal
 
           - name: Template (target=template_release)
             cache-name: macos-template
             target: template_release
+            module-suffix: ""
             scons-flags: debug_symbols=no
             bin: ./bin/godot.macos.template_release.universal
 
           - name: Template w/ Mono (target=template_release)
             cache-name: macos-template-mono
             target: template_release
+            module-suffix: .mono
             scons-flags: >-
               debug_symbols=no
               module_mono_enabled=yes
@@ -47,11 +51,13 @@ jobs:
           - name: Template (target=template_debug)
             cache-name: macos-template-debug
             target: template_debug
+            module-suffix: ""
             bin: ./bin/godot.macos.template_debug.universal
 
           - name: Template w/ Mono (target=template_debug)
             cache-name: macos-template-debug-mono
             target: template_debug
+            module-suffix: .mono
             scons-flags: module_mono_enabled=yes
             bin: ./bin/godot.macos.template_debug.mono.universal
 
@@ -125,8 +131,8 @@ jobs:
 
       - name: Prepare artifact
         run: |
-          lipo -create ./bin/godot.macos.${{ matrix.target }}.x86_64 ./bin/godot.macos.${{ matrix.target }}.arm64 -output ./bin/godot.macos.${{ matrix.target }}.universal
-          rm ./bin/godot.macos.${{ matrix.target }}.x86_64 ./bin/godot.macos.${{ matrix.target }}.arm64
+          lipo -create ./bin/godot.macos.${{ matrix.target }}.x86_64${{ matrix.module-suffix }} ./bin/godot.macos.${{ matrix.target }}.arm64${{ matrix.module-suffix }} -output ./bin/godot.macos.${{ matrix.target }}${{ matrix.module-suffix }}.universal
+          rm ./bin/godot.macos.${{ matrix.target }}.x86_64${{ matrix.module-suffix }} ./bin/godot.macos.${{ matrix.target }}.arm64${{ matrix.module-suffix }}
           rm -rf ./bin/build_deps
           strip bin/godot.*
           chmod +x bin/godot.*
