@@ -21,6 +21,8 @@ Most of this fork is focused on making changes to GDScript to add new features -
 - Nested arrays/Dictionaries.
 - Immutable variables using the 'let' keyword.
 - Readonly keyword for variables.
+- Named arguments in functions.
+- Namespaces using the 'namespace' and 'import' keywords.
   
 **Rendering**
 - Native motion blur using Camera Attributes.
