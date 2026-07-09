@@ -1,4 +1,4 @@
-name: 🍏 iOS Builds
+name: 🥽 visionOS Builds
 on:
   workflow_call:
   workflow_dispatch:
@@ -11,7 +11,7 @@ env:
     debug_symbols=no
 
 jobs:
-  ios-template:
+  visionos-template:
     # From https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#choosing-github-hosted-runners
     runs-on: macos-26
     name: ${{ matrix.name }}
@@ -21,11 +21,11 @@ jobs:
       matrix:
         include:
           - name: Template (target=template_release)
-            cache-name: ios-template
+            cache-name: visionos-template
             target: template_release
 
           - name: Template (target=template_debug)
-            cache-name: ios-template-debug
+            cache-name: visionos-template-debug
             target: template_debug
 
     steps:
@@ -45,7 +45,7 @@ jobs:
         uses: ./.github/actions/godot-build
         with:
           scons-flags: ${{ env.SCONS_FLAGS }}
-          platform: ios
+          platform: visionos
           target: ${{ matrix.target }}
 
       - name: Save Godot build cache

@@ -26,6 +26,7 @@ jobs:
           - name: Editor (target=editor)
             cache-name: android-editor
             target: editor
+            edition: standard
             instrumented_tests: true
             scons-flags: >-
               arch=arm64
@@ -34,14 +35,66 @@ jobs:
           - name: Template arm32 (target=template_debug, arch=arm32)
             cache-name: android-template-arm32
             target: template_debug
+            edition: standard
             instrumented_tests: false
             scons-flags: arch=arm32
 
           - name: Template arm64 (target=template_debug, arch=arm64)
             cache-name: android-template-arm64
             target: template_debug
+            edition: standard
             instrumented_tests: true
             scons-flags: arch=arm64
+
+          - name: Template release arm32 (target=template_release, arch=arm32)
+            cache-name: android-template-release-arm32
+            target: template_release
+            edition: standard
+            instrumented_tests: false
+            scons-flags: arch=arm32
+
+          - name: Template release arm64 (target=template_release, arch=arm64)
+            cache-name: android-template-release-arm64
+            target: template_release
+            edition: standard
+            instrumented_tests: false
+            scons-flags: arch=arm64
+
+          - name: Template Mono arm32 (target=template_debug, arch=arm32)
+            cache-name: android-template-mono-arm32
+            target: template_debug
+            edition: mono
+            instrumented_tests: false
+            scons-flags: >-
+              arch=arm32
+              module_mono_enabled=yes
+
+          - name: Template Mono arm64 (target=template_debug, arch=arm64)
+            cache-name: android-template-mono-arm64
+            target: template_debug
+            edition: mono
+            instrumented_tests: false
+            scons-flags: >-
+              arch=arm64
+              module_mono_enabled=yes
+
+          - name: Template Mono release arm32 (target=template_release, arch=arm32)
+            cache-name: android-template-mono-release-arm32
+            target: template_release
+            edition: mono
+            instrumented_tests: false
+            scons-flags: >-
+              arch=arm32
+              module_mono_enabled=yes
+
+          - name: Template Mono release arm64 (target=template_release, arch=arm64)
+            cache-name: android-template-mono-release-arm64
+            target: template_release
+            edition: mono
+            instrumented_tests: false
+            scons-flags: >-
+              arch=arm64
+              module_mono_enabled=yes
 
     steps:
       - name: Checkout
@@ -81,10 +134,14 @@ jobs:
         continue-on-error: true
 
       - name: Generate Godot templates
-        if: matrix.target == 'template_debug'
+        if: matrix.target != 'editor'
         run: |
           cd platform/android/java
-          ./gradlew generateGodotTemplates
+          if [ "${{ matrix.edition }}" = "mono" ]; then
+            ./gradlew generateGodotMonoTemplates
+          else
+            ./gradlew generateGodotTemplates
+          fi
           cd ../../..
           ls -l bin/
 
