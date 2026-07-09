@@ -6,7 +6,7 @@
   </a>
 </p>
 
-This is my fork of the [Godot Engine](https://godotengine.org) to add features that have either a low or non-existent chance of getting merged into main Godot at this time. 
+This is my fork of the [Godot Engine](https://godotengine.org) to add features that have either a low or non-existent chance of getting merged into main Godot at this time.
 
 I've mostly made this for my own personal use in my projects, but you can still use this version if you so chose, just know that I won't be able to give any real support. I'm not an experience C++ programmer and I have no real experience in game engine development, so the code changes might not be optimal, but in my testing I've yet to run into any significant problems yet. I'm willing to accept PRs onto this repo, but I also won't be able to maintain them as regularly as a more "serious" fork might. But hey, if you see any code changes that could be done better or even have a feature you think could be cool, I can definitely take a look!
 
@@ -27,7 +27,7 @@ Most of this fork is focused on making changes to GDScript to add new features -
 - Readonly keyword for variables.
 - Named arguments in functions.
 - Namespaces using the 'namespace' and 'import' keywords.
-  
+
 **Rendering**
 - Native motion blur using Camera Attributes.
 - Sheen rendering for materials.
