@@ -1824,6 +1824,21 @@ static bool _try_convert_struct_array_node_paths_to_nodes(const Variant &p_value
 	return true;
 }
 
+static bool _clear_if_freed_object(Variant &r_value) {
+	if (r_value.get_type() != Variant::OBJECT) {
+		return false;
+	}
+
+	bool was_freed = false;
+	r_value.get_validated_object_with_check(was_freed);
+	if (was_freed) {
+		r_value = Variant();
+		return true;
+	}
+
+	return false;
+}
+
 void GDScriptInstance::_lazy_convert_member_value(int p_index) {
 	if (owner == nullptr || p_index < 0 || p_index >= members.size()) {
 		return;
@@ -1939,7 +1954,8 @@ bool GDScriptInstance::get(const StringName &p_name, Variant &r_ret) const {
 		if (E) {
 			if (likely(script->valid) && E->value.getter) {
 				Callable::CallError err;
-				const Variant ret = const_cast<GDScriptInstance *>(this)->callp(E->value.getter, nullptr, 0, err);
+				Variant ret = const_cast<GDScriptInstance *>(this)->callp(E->value.getter, nullptr, 0, err);
+				_clear_if_freed_object(ret);
 				r_ret = (err.error == Callable::CallError::CALL_OK) ? ret : Variant();
 				Variant converted;
 				if (_try_convert_struct_node_paths_to_nodes(r_ret, E->value.data_type, owner, converted)) {
@@ -1972,7 +1988,8 @@ bool GDScriptInstance::get(const StringName &p_name, Variant &r_ret) const {
 			if (E) {
 				if (likely(sptr->valid) && E->value.getter) {
 					Callable::CallError ce;
-					const Variant ret = const_cast<GDScript *>(sptr)->callp(E->value.getter, nullptr, 0, ce);
+					Variant ret = const_cast<GDScript *>(sptr)->callp(E->value.getter, nullptr, 0, ce);
+					_clear_if_freed_object(ret);
 					r_ret = (ce.error == Callable::CallError::CALL_OK) ? ret : Variant();
 					return true;
 				}
@@ -2017,6 +2034,7 @@ bool GDScriptInstance::get(const StringName &p_name, Variant &r_ret) const {
 
 				Callable::CallError err;
 				Variant ret = E->value->call(const_cast<GDScriptInstance *>(this), (const Variant **)args, 1, err);
+				_clear_if_freed_object(ret);
 				if (err.error == Callable::CallError::CALL_OK && ret.get_type() != Variant::NIL) {
 					r_ret = ret;
 					return true;
@@ -2312,7 +2330,7 @@ void GDScriptInstance::notification(int p_notification, bool p_reversed) {
 	const StringName &notification_str = GDScriptLanguage::get_singleton()->strings._notification;
 
 	LocalVector<GDScript *> script_stack;
-	uint32_t script_count = 0;
+	int script_count = 0;
 	for (GDScript *sptr = script.ptr(); sptr; sptr = sptr->base.ptr(), ++script_count) {
 		script_stack.push_back(sptr);
 	}

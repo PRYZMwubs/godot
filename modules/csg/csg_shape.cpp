@@ -285,7 +285,7 @@ static void _unpack_manifold(
 	constexpr int32_t order[3] = { 0, 2, 1 };
 
 	for (size_t run_i = 0; run_i < mesh.runIndex.size() - 1; run_i++) {
-		uint32_t original_id = -1;
+		uint32_t original_id = static_cast<uint32_t>(-1);
 		if (run_i < mesh.runOriginalID.size()) {
 			original_id = mesh.runOriginalID[run_i];
 		}
