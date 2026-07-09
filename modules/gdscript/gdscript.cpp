@@ -1574,6 +1574,40 @@ GDScript::~GDScript() {
 //////////////////////////////
 
 static bool _try_convert_plain_array_to_struct_array(const Variant &p_value, const GDScriptDataType &p_data_type, Variant &r_value) {
+	if (p_value.get_type() == Variant::ARRAY && p_data_type.kind == GDScriptDataType::STRUCT) {
+		const Array input = p_value;
+		if (input.is_struct()) {
+			return false;
+		}
+
+		Ref<GDScriptStruct> struct_def = p_data_type.struct_def_variant;
+		if (struct_def.is_null()) {
+			return false;
+		}
+
+		if (input.size() > struct_def->fields.size()) {
+			return false;
+		}
+
+		Vector<StringName> field_names;
+		Vector<Variant> default_values;
+		field_names.resize(struct_def->fields.size());
+		default_values.resize(struct_def->fields.size());
+		for (int i = 0; i < struct_def->fields.size(); i++) {
+			field_names.write[i] = struct_def->fields[i].name;
+			default_values.write[i] = struct_def->fields[i].default_value;
+		}
+
+		Array struct_value;
+		struct_value.set_as_struct(field_names, default_values);
+		for (int i = 0; i < input.size(); i++) {
+			struct_value.set_struct_member_by_offset(i, input[i]);
+		}
+
+		r_value = struct_value;
+		return true;
+	}
+
 	if (p_value.get_type() != Variant::ARRAY || p_data_type.kind != GDScriptDataType::BUILTIN || p_data_type.builtin_type != Variant::ARRAY || !p_data_type.has_container_element_type(0)) {
 		return false;
 	}
@@ -1634,6 +1668,186 @@ static bool _try_convert_plain_array_to_struct_array(const Variant &p_value, con
 	return true;
 }
 
+static bool _struct_field_expects_node_object(const GDScriptStruct::Field &p_field) {
+	if (p_field.property_info.hint == PROPERTY_HINT_NODE_TYPE) {
+		return true;
+	}
+
+	if (p_field.property_info.class_name != StringName() && ClassDB::is_parent_class(p_field.property_info.class_name, SNAME("Node"))) {
+		return true;
+	}
+
+	if (!p_field.property_info.hint_string.is_empty()) {
+		const StringName hinted_class = p_field.property_info.hint_string;
+		if (ClassDB::is_parent_class(hinted_class, SNAME("Node"))) {
+			return true;
+		}
+	}
+
+	const GDScriptDataType &field_type = p_field.data_type;
+	if (field_type.kind == GDScriptDataType::BUILTIN && field_type.builtin_type == Variant::OBJECT &&
+			field_type.native_type != StringName() && ClassDB::is_parent_class(field_type.native_type, SNAME("Node"))) {
+		return true;
+	}
+
+	if (field_type.kind == GDScriptDataType::NATIVE) {
+		return field_type.native_type != StringName() && ClassDB::is_parent_class(field_type.native_type, SNAME("Node"));
+	}
+
+	if (field_type.kind == GDScriptDataType::SCRIPT || field_type.kind == GDScriptDataType::GDSCRIPT) {
+		Script *script = field_type.script_type;
+		if (!script && field_type.script_type_ref.is_valid()) {
+			script = field_type.script_type_ref.ptr();
+		}
+		if (script) {
+			const StringName base_type = script->get_instance_base_type();
+			return base_type != StringName() && ClassDB::is_parent_class(base_type, SNAME("Node"));
+		}
+	}
+
+	return false;
+}
+
+static bool _try_convert_struct_node_paths_to_nodes(const Variant &p_value, const GDScriptDataType &p_data_type, Object *p_owner, Variant &r_value) {
+	if (p_owner == nullptr) {
+		return false;
+	}
+
+	Node *owner_node = Object::cast_to<Node>(p_owner);
+	if (owner_node == nullptr || p_value.get_type() != Variant::ARRAY) {
+		return false;
+	}
+
+	const Array input = p_value;
+	if (!input.is_struct()) {
+		return false;
+	}
+
+	Array converted = input;
+	if (!converted.is_struct()) {
+		return false;
+	}
+	bool changed = false;
+
+	Ref<GDScriptStruct> struct_def = p_data_type.struct_def_variant;
+	if (p_data_type.kind == GDScriptDataType::STRUCT && struct_def.is_valid()) {
+		const int field_count = MIN(converted.size(), struct_def->fields.size());
+		for (int i = 0; i < field_count; i++) {
+			const GDScriptStruct::Field &field = struct_def->fields[i];
+			Variant field_value = converted.get_struct_member_by_offset(i);
+
+			if (_struct_field_expects_node_object(field) && field_value.get_type() == Variant::NODE_PATH) {
+				Node *resolved_node = owner_node->get_node_or_null(field_value);
+				if (resolved_node != nullptr) {
+					field_value = resolved_node;
+					changed = true;
+				}
+			}
+
+			Variant nested_value;
+			if (_try_convert_struct_node_paths_to_nodes(field_value, field.data_type, p_owner, nested_value)) {
+				field_value = nested_value;
+				changed = true;
+			}
+
+			converted.set_struct_member_by_offset(i, field_value);
+		}
+	} else {
+		const int field_count = converted.size();
+		for (int i = 0; i < field_count; i++) {
+			Variant field_value = converted.get_struct_member_by_offset(i);
+			if (field_value.get_type() == Variant::NODE_PATH) {
+				Node *resolved_node = owner_node->get_node_or_null(field_value);
+				if (resolved_node != nullptr) {
+					field_value = resolved_node;
+					changed = true;
+				}
+			}
+
+			Variant nested_value;
+			if (_try_convert_struct_node_paths_to_nodes(field_value, GDScriptDataType(), p_owner, nested_value)) {
+				field_value = nested_value;
+				changed = true;
+			}
+
+			converted.set_struct_member_by_offset(i, field_value);
+		}
+	}
+
+	if (!changed) {
+		return false;
+	}
+
+	r_value = converted;
+	return true;
+}
+
+static bool _try_convert_struct_array_node_paths_to_nodes(const Variant &p_value, const GDScriptDataType &p_data_type, Object *p_owner, Variant &r_value) {
+	if (p_owner == nullptr || p_value.get_type() != Variant::ARRAY) {
+		return false;
+	}
+
+	bool has_typed_struct_element = false;
+	GDScriptDataType element_type;
+	if (p_data_type.kind == GDScriptDataType::BUILTIN && p_data_type.builtin_type == Variant::ARRAY && p_data_type.has_container_element_type(0)) {
+		element_type = p_data_type.get_container_element_type(0);
+		has_typed_struct_element = element_type.kind == GDScriptDataType::STRUCT;
+	}
+
+	Array input = p_value;
+	Array converted = input.duplicate();
+	bool changed = false;
+
+	for (int i = 0; i < converted.size(); i++) {
+		Variant elem_value = converted[i];
+		if (elem_value.get_type() != Variant::ARRAY) {
+			continue;
+		}
+
+		Array elem_array = elem_value;
+		if (!elem_array.is_struct()) {
+			continue;
+		}
+
+		Variant elem_converted;
+		if (_try_convert_struct_node_paths_to_nodes(elem_value, has_typed_struct_element ? element_type : GDScriptDataType(), p_owner, elem_converted)) {
+			converted[i] = elem_converted;
+			changed = true;
+		}
+	}
+
+	if (!changed) {
+		return false;
+	}
+
+	r_value = converted;
+	return true;
+}
+
+void GDScriptInstance::_lazy_convert_member_value(int p_index) {
+	if (owner == nullptr || p_index < 0 || p_index >= members.size()) {
+		return;
+	}
+
+	const GDScript::MemberInfo *member = nullptr;
+	for (const KeyValue<StringName, GDScript::MemberInfo> &E : script->member_indices) {
+		if (E.value.index == p_index) {
+			member = &E.value;
+			break;
+		}
+	}
+	if (member == nullptr) {
+		return;
+	}
+
+	Variant value = members[p_index];
+	Variant converted;
+	if (_try_convert_struct_node_paths_to_nodes(value, member->data_type, owner, converted) ||
+			_try_convert_struct_array_node_paths_to_nodes(value, member->data_type, owner, converted)) {
+		members.write[p_index] = converted;
+	}
+}
+
 bool GDScriptInstance::set(const StringName &p_name, const Variant &p_value) {
 	{
 		HashMap<StringName, GDScript::MemberInfo>::Iterator E = script->member_indices.find(p_name);
@@ -1641,12 +1855,14 @@ bool GDScriptInstance::set(const StringName &p_name, const Variant &p_value) {
 			const GDScript::MemberInfo *member = &E->value;
 			Variant value = p_value;
 			_try_convert_plain_array_to_struct_array(p_value, member->data_type, value);
+			_try_convert_struct_node_paths_to_nodes(value, member->data_type, owner, value);
 			if (!member->data_type.is_type(value)) {
 				const Variant *args = &p_value;
 				Callable::CallError err;
 				Variant::construct(member->data_type.builtin_type, value, &args, 1, err);
 				if (!member->data_type.is_type(value)) {
 					_try_convert_plain_array_to_struct_array(value, member->data_type, value);
+					_try_convert_struct_node_paths_to_nodes(value, member->data_type, owner, value);
 				}
 				if (err.error != Callable::CallError::CALL_OK || !member->data_type.is_type(value)) {
 					return false;
@@ -1672,12 +1888,14 @@ bool GDScriptInstance::set(const StringName &p_name, const Variant &p_value) {
 				const GDScript::MemberInfo *member = &E->value;
 				Variant value = p_value;
 				_try_convert_plain_array_to_struct_array(p_value, member->data_type, value);
+				_try_convert_struct_node_paths_to_nodes(value, member->data_type, owner, value);
 				if (!member->data_type.is_type(value)) {
 					const Variant *args = &p_value;
 					Callable::CallError err;
 					Variant::construct(member->data_type.builtin_type, value, &args, 1, err);
 					if (!member->data_type.is_type(value)) {
 						_try_convert_plain_array_to_struct_array(value, member->data_type, value);
+						_try_convert_struct_node_paths_to_nodes(value, member->data_type, owner, value);
 					}
 					if (err.error != Callable::CallError::CALL_OK || !member->data_type.is_type(value)) {
 						return false;
@@ -1723,9 +1941,18 @@ bool GDScriptInstance::get(const StringName &p_name, Variant &r_ret) const {
 				Callable::CallError err;
 				const Variant ret = const_cast<GDScriptInstance *>(this)->callp(E->value.getter, nullptr, 0, err);
 				r_ret = (err.error == Callable::CallError::CALL_OK) ? ret : Variant();
+				Variant converted;
+				if (_try_convert_struct_node_paths_to_nodes(r_ret, E->value.data_type, owner, converted)) {
+					r_ret = converted;
+				}
 				return true;
 			}
 			r_ret = members[E->value.index];
+			Variant converted;
+			if (_try_convert_struct_node_paths_to_nodes(r_ret, E->value.data_type, owner, converted)) {
+				r_ret = converted;
+				const_cast<GDScriptInstance *>(this)->members.write[E->value.index] = converted;
+			}
 			return true;
 		}
 	}

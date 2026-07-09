@@ -3071,6 +3071,9 @@ void EditorPropertyNodePath::_node_assign() {
 		n = base_node == nullptr ? nullptr : base_node->get_node_or_null(val);
 	} else {
 		n = Object::cast_to<Node>(val);
+		if (n && !n->is_inside_tree()) {
+			n = nullptr;
+		}
 	}
 	scene_tree->popup_scenetree_dialog(n, get_base_node());
 }

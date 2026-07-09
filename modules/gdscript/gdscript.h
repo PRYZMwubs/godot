@@ -405,6 +405,7 @@ class GDScriptInstance : public ScriptInstance {
 	SelfList<GDScriptInstance> script_instance_list; // Linked list of instances with the same script.
 
 	void _call_implicit_ready_recursively(GDScript *p_script);
+	void _lazy_convert_member_value(int p_index);
 
 public:
 	virtual Object *get_owner() { return owner; }

@@ -713,6 +713,9 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 			} \
 			OPCODE_BREAK; \
 		} \
+		if (address_type == ADDR_TYPE_MEMBER && p_instance) { \
+			p_instance->_lazy_convert_member_value(address_index); \
+		} \
 		m_v = &variant_addresses[address_type][address_index]; \
 		if (unlikely(!m_v)) \
 			OPCODE_BREAK; \
@@ -726,7 +729,12 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 	Variant *m_v; \
 	{ \
 		int address = _code_ptr[ip + 1 + (m_code_ofs)]; \
-		m_v = &variant_addresses[(address & ADDR_TYPE_MASK) >> ADDR_BITS][address & ADDR_MASK]; \
+		int address_type = (address & ADDR_TYPE_MASK) >> ADDR_BITS; \
+		int address_index = address & ADDR_MASK; \
+		if (address_type == ADDR_TYPE_MEMBER && p_instance) { \
+			p_instance->_lazy_convert_member_value(address_index); \
+		} \
+		m_v = &variant_addresses[address_type][address_index]; \
 		if (unlikely(!m_v)) \
 			OPCODE_BREAK; \
 	}

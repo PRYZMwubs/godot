@@ -3054,6 +3054,21 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 					field.data_type = _gdtype_from_datatype(var_node->get_datatype(), p_script);
 					field.property_info = var_node->get_datatype().to_property_info(field.name);
 
+					if (field.property_info.type == Variant::OBJECT && field.property_info.hint == PROPERTY_HINT_NONE && field.property_info.class_name != StringName()) {
+						StringName native_base = field.property_info.class_name;
+						if (ScriptServer::is_global_class(native_base)) {
+							native_base = ScriptServer::get_global_class_native_base(native_base);
+						}
+
+						if (ClassDB::is_parent_class(native_base, SNAME("Resource"))) {
+							field.property_info.hint = PROPERTY_HINT_RESOURCE_TYPE;
+							field.property_info.hint_string = field.property_info.class_name;
+						} else if (ClassDB::is_parent_class(native_base, SNAME("Node"))) {
+							field.property_info.hint = PROPERTY_HINT_NODE_TYPE;
+							field.property_info.hint_string = field.property_info.class_name;
+						}
+					}
+
 					if (var_node->initializer != nullptr && var_node->initializer->is_constant) {
 						field.default_value = var_node->initializer->reduced_value;
 						GDScriptCompiler::convert_to_initializer_type(field.default_value, var_node);

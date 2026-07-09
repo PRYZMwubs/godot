@@ -277,6 +277,36 @@ void EditorPropertyStruct::_property_changed(const String &p_property, Variant p
 		p_value = Variant();
 	}
 	int index = p_property.get_slicec('/', 1).to_int();
+	if (index >= 0 && index < fields.size()) {
+		const Dictionary field = fields[index];
+		const PropertyHint field_hint = (PropertyHint)(int)field["hint"];
+		if (field_hint == PROPERTY_HINT_NODE_TYPE && p_value.get_type() == Variant::OBJECT) {
+			Node *selected_node = Object::cast_to<Node>(p_value);
+			Node *base_node = Object::cast_to<Node>(get_edited_object());
+			if (!base_node && object->has_meta("__base_node_relative")) {
+				base_node = Object::cast_to<Node>(object->get_meta("__base_node_relative"));
+			}
+			if (!base_node) {
+				base_node = Object::cast_to<Node>(InspectorDock::get_inspector_singleton()->get_edited_object());
+			}
+			if (!base_node) {
+				// Try the editor selection history as a final fallback.
+				if (EditorNode::get_singleton()->get_editor_selection_history()->get_path_size() > 0) {
+					Object *base = ObjectDB::get_instance(EditorNode::get_singleton()->get_editor_selection_history()->get_path_object(0));
+					if (base) {
+						base_node = Object::cast_to<Node>(base);
+					}
+				}
+			}
+			if (selected_node && selected_node->is_inside_tree()) {
+				if (base_node && base_node->is_inside_tree()) {
+					p_value = base_node->get_path_to(selected_node);
+				} else {
+					p_value = selected_node->get_path();
+				}
+			}
+		}
+	}
 	Variant array = object->get_array().duplicate();
 	array.set(index, p_value);
 	emit_changed(get_edited_property(), array, p_name, p_changing);
@@ -325,6 +355,12 @@ void EditorPropertyStruct::update_property() {
 	}
 
 	object->set_array(array);
+
+	if (Node *base_node = Object::cast_to<Node>(get_edited_object())) {
+		object->set_meta("__base_node_relative", base_node);
+	} else if (object->has_meta("__base_node_relative")) {
+		object->remove_meta("__base_node_relative");
+	}
 
 	edit->set_text_alignment(HORIZONTAL_ALIGNMENT_CENTER);
 	edit->set_button_icon(Ref<Texture2D>());
