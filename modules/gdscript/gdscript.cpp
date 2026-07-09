@@ -1934,15 +1934,25 @@ bool GDScriptInstance::set(const StringName &p_name, const Variant &p_value) {
 }
 
 bool GDScriptInstance::get(const StringName &p_name, Variant &r_ret) const {
+	// Keep RefCounted owners alive while invoking script getters to avoid deleting this instance mid-call.
+	Ref<RefCounted> owner_lifetime;
+	if (owner) {
+		if (RefCounted *rc = Object::cast_to<RefCounted>(owner)) {
+			owner_lifetime = Ref<RefCounted>(rc);
+		}
+	}
+
 	{
 		HashMap<StringName, GDScript::MemberInfo>::ConstIterator E = script->member_indices.find(p_name);
 		if (E) {
 			if (likely(script->valid) && E->value.getter) {
+				const GDScriptDataType data_type = E->value.data_type;
+				Object *owner_ptr = owner;
 				Callable::CallError err;
 				const Variant ret = const_cast<GDScriptInstance *>(this)->callp(E->value.getter, nullptr, 0, err);
 				r_ret = (err.error == Callable::CallError::CALL_OK) ? ret : Variant();
 				Variant converted;
-				if (_try_convert_struct_node_paths_to_nodes(r_ret, E->value.data_type, owner, converted)) {
+				if (ObjectDB::get_instance(owner_id) != nullptr && _try_convert_struct_node_paths_to_nodes(r_ret, data_type, owner_ptr, converted)) {
 					r_ret = converted;
 				}
 				return true;
