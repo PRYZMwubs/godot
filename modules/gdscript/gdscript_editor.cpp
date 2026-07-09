@@ -134,7 +134,7 @@ static String _get_global_class_completion_name(const StringName &p_class_name, 
 	return class_name;
 }
 
-static void _add_global_class_completion_options(const GDScriptParser::CompletionContext &p_context, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
+[[maybe_unused]] static void _add_global_class_completion_options(const GDScriptParser::CompletionContext &p_context, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
 	LocalVector<StringName> global_classes;
 	ScriptServer::get_global_class_list(global_classes);
 
