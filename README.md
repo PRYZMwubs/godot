@@ -12,6 +12,9 @@ Most of this fork is focused on making changes to GDScript to add new features -
 
 (Note: I'm currently focusing on the 4.7-Custom branch, no immediate plans to bring the features to the other branches yet.)
 
+<img width="1177" height="1186" alt="image" src="https://github.com/user-attachments/assets/d223b72d-819b-43e5-ba61-7c5799760c79" />
+
+
 ## All new features
 **GDScript**
 - Structs for GDScript - exporting and arrays supported.
