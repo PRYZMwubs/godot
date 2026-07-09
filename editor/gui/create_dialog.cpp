@@ -38,6 +38,11 @@
 #include "editor/editor_string_names.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/filter_line_edit.h"
+
+static String _get_display_type_name(const String &p_type_name) {
+	const int dot = p_type_name.rfind(".");
+	return dot == -1 ? p_type_name : p_type_name.substr(dot + 1);
+}
 #include "editor/settings/editor_feature_profile.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
@@ -414,7 +419,7 @@ void CreateDialog::_configure_search_option_item(TreeItem *r_item, const StringN
 	} else if (script_type) {
 		is_custom_type = true;
 		type_name = p_type;
-		text = p_type;
+		text = _get_display_type_name(p_type);
 
 		if (!allow_abstract_scripts) {
 			is_abstract = ScriptServer::is_global_class_abstract(p_type);
@@ -678,7 +683,8 @@ void CreateDialog::select_type(const String &p_type, bool p_center_on_item) {
 	to_select->select(0);
 	search_options->scroll_to_item(to_select, p_center_on_item);
 
-	help_bit->parse_symbol("class|" + p_type + "|");
+	const String display_name = ScriptServer::is_global_class(p_type) ? _get_display_type_name(p_type) : p_type;
+	help_bit->parse_symbol("class|" + p_type + "|" + display_name);
 
 	favorite->set_disabled(false);
 	favorite->set_pressed(favorite_list.has(p_type));
@@ -724,6 +730,12 @@ String CreateDialog::get_selected_type_name() {
 	if (!selected) {
 		return String();
 	}
+	if (selected->has_meta(SNAME("_script_path"))) {
+		Array meta = selected->get_metadata(0).operator Array();
+		if (meta.size() == 2) {
+			return meta[1].operator String();
+		}
+	}
 	return selected->get_text(0).get_slicec(' ', 0);
 }
 
@@ -750,7 +762,7 @@ Variant CreateDialog::instantiate_selected() {
 			obj = EditorNode::get_editor_data().script_class_instance(type_name);
 			Node *n = Object::cast_to<Node>(obj);
 			if (n) {
-				n->set_name(type_name);
+				n->set_name(_get_display_type_name(type_name));
 			}
 		} else {
 			obj = EditorNode::get_editor_data().instantiate_custom_type(selected->get_text(0), type_name);

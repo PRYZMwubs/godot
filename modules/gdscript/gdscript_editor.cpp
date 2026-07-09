@@ -88,6 +88,78 @@ Vector<String> GDScriptLanguage::get_comment_delimiters() const {
 	}
 }
 
+static String _get_display_type_name(const String &p_type_name) {
+	const int dot = p_type_name.rfind(".");
+	return dot == -1 ? p_type_name : p_type_name.substr(dot + 1);
+}
+
+static String _get_global_class_completion_name(const StringName &p_class_name, const GDScriptParser::CompletionContext &p_context) {
+	const String class_name = p_class_name;
+	if (!class_name.contains(".") || p_context.parser == nullptr || p_context.parser->get_tree() == nullptr) {
+		return class_name;
+	}
+
+	const String local_name = _get_display_type_name(class_name);
+	String namespace_path = p_context.parser->get_tree()->namespace_path;
+	while (!namespace_path.is_empty()) {
+		if (class_name == namespace_path + "." + local_name) {
+			return local_name;
+		}
+
+		const int dot = namespace_path.rfind(".");
+		if (dot == -1) {
+			break;
+		}
+		namespace_path = namespace_path.substr(0, dot);
+	}
+
+	for (const GDScriptParser::ImportNode &import_node : p_context.parser->get_imports()) {
+		if (import_node.name.is_empty()) {
+			continue;
+		}
+
+		String import_path;
+		for (int i = 0; i < import_node.name.size(); i++) {
+			if (i > 0) {
+				import_path += ".";
+			}
+			import_path += String(import_node.name[i]->name);
+		}
+
+		if (class_name == import_path + "." + local_name) {
+			return local_name;
+		}
+	}
+
+	return class_name;
+}
+
+static void _add_global_class_completion_options(const GDScriptParser::CompletionContext &p_context, HashMap<String, ScriptLanguage::CodeCompletionOption> &r_result) {
+	LocalVector<StringName> global_classes;
+	ScriptServer::get_global_class_list(global_classes);
+
+	HashMap<String, int> display_name_counts;
+	for (const StringName &class_name : global_classes) {
+		const String display_name = _get_global_class_completion_name(class_name, p_context);
+		int count = 0;
+		if (const int *existing = display_name_counts.getptr(display_name)) {
+			count = *existing;
+		}
+		display_name_counts.insert(display_name, count + 1);
+	}
+
+	for (const StringName &class_name : global_classes) {
+		String completion_name = _get_global_class_completion_name(class_name, p_context);
+		const int *count = display_name_counts.getptr(completion_name);
+		if (count != nullptr && *count > 1) {
+			completion_name = class_name;
+		}
+
+		ScriptLanguage::CodeCompletionOption option(completion_name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_OTHER_USER_CODE);
+		r_result.insert(option.display, option);
+	}
+}
+
 Vector<String> GDScriptLanguage::get_doc_comment_delimiters() const {
 	static const Vector<String> delimiters = { "##" };
 	return delimiters;
@@ -113,6 +185,7 @@ Ref<Script> GDScriptLanguage::make_template(const String &p_template, const Stri
 	scr.instantiate();
 
 	String processed_template = p_template;
+	String base_class_name = p_base_class_name;
 
 #ifdef TOOLS_ENABLED
 	const bool type_hints = EditorSettings::get_singleton()->get_setting("text_editor/completion/add_type_hints");
@@ -138,7 +211,16 @@ Ref<Script> GDScriptLanguage::make_template(const String &p_template, const Stri
 									 .replace(" -> Object", "");
 	}
 
-	processed_template = processed_template.replace("_BASE_", p_base_class_name)
+	if (ScriptServer::is_global_class(p_base_class_name)) {
+		const int dot = p_base_class_name.rfind(".");
+		if (dot != -1) {
+			const String namespace_name = p_base_class_name.substr(0, dot);
+			base_class_name = p_base_class_name.substr(dot + 1);
+			processed_template = processed_template.replace("extends _BASE_\n", "extends _BASE_\nnamespace " + namespace_name + "\n");
+		}
+	}
+
+	processed_template = processed_template.replace("_BASE_", base_class_name)
 								 .replace("_CLASS_SNAKE_CASE_", p_class_name.to_snake_case().validate_unicode_identifier())
 								 .replace("_CLASS_", p_class_name.to_pascal_case().validate_unicode_identifier())
 								 .replace("_TS_", _get_indentation());
@@ -1248,12 +1330,7 @@ static void _list_available_types(bool p_inherit_only, bool p_include_trait, GDS
 	}
 
 	// Global scripts
-	LocalVector<StringName> global_classes;
-	ScriptServer::get_global_class_list(global_classes);
-	for (const StringName &class_name : global_classes) {
-		ScriptLanguage::CodeCompletionOption option(class_name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_OTHER_USER_CODE);
-		r_result.insert(option.display, option);
-	}
+	_add_global_class_completion_options(p_context, r_result);
 
 	// Global enums
 	if (!p_inherit_only) {
@@ -1855,12 +1932,7 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 	_find_global_enums(r_result);
 
 	// Global classes
-	LocalVector<StringName> global_classes;
-	ScriptServer::get_global_class_list(global_classes);
-	for (const StringName &class_name : global_classes) {
-		ScriptLanguage::CodeCompletionOption option(class_name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_OTHER_USER_CODE);
-		r_result.insert(option.display, option);
-	}
+	_add_global_class_completion_options(p_context, r_result);
 }
 
 static GDScriptCompletionIdentifier _type_from_variant(const Variant &p_value, GDScriptParser::CompletionContext &p_context) {
@@ -3805,12 +3877,7 @@ static Vector<ScriptLanguage::TextEdit> get_override_text_edits(const GDScriptPa
 				location_offset += 1;
 				clss = clss->base_type.class_type;
 			}
-			LocalVector<StringName> global_classes;
-			ScriptServer::get_global_class_list(global_classes);
-			for (const StringName &E : global_classes) {
-				ScriptLanguage::CodeCompletionOption option(E, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_OTHER_USER_CODE);
-				options.insert(option.display, option);
-			}
+			_add_global_class_completion_options(completion_context, options);
 			r_forced = true;
 		} break;
 		case GDScriptParser::COMPLETION_NAMESPACE_PATH: {

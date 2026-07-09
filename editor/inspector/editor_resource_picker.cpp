@@ -85,12 +85,17 @@ static bool _has_sub_resources(const Ref<Resource> &p_res) {
 	return false;
 }
 
+static String _get_display_type_name(const String &p_type_name) {
+	const int dot = p_type_name.rfind(".");
+	return dot == -1 ? p_type_name : p_type_name.substr(dot + 1);
+}
+
 void EditorResourcePicker::_update_resource() {
 	String resource_path;
 	if (edited_resource.is_valid() && edited_resource->get_path().is_resource_file()) {
 		resource_path = edited_resource->get_path() + "\n";
 	}
-	String class_name = _get_resource_type(edited_resource);
+	String class_name = _get_display_type_name(_get_resource_type(edited_resource));
 
 	if (preview_rect) {
 		preview_rect->set_texture(Ref<Texture2D>());
@@ -120,7 +125,7 @@ void EditorResourcePicker::_update_resource() {
 			EditorResourcePreview::get_singleton()->queue_edited_resource_preview(edited_resource, callable_mp(this, &EditorResourcePicker::_update_resource_preview).bind(edited_resource->get_instance_id()));
 		}
 	} else if (edited_resource.is_valid()) {
-		assign_button->set_tooltip_text(resource_path + TTR("Type:") + " " + edited_resource->get_class());
+		assign_button->set_tooltip_text(resource_path + TTR("Type:") + " " + class_name);
 	}
 
 	if (edited_resource.is_null()) {
@@ -146,7 +151,7 @@ void EditorResourcePicker::_update_resource() {
 				if (custom_script.is_valid()) {
 					const String global_name = custom_script->get_global_name();
 					if (!global_name.is_empty()) {
-						resource_name = global_name;
+						resource_name = _get_display_type_name(global_name);
 					}
 				}
 			}
@@ -1264,9 +1269,9 @@ void EditorResourcePicker::_gather_resources_to_duplicate(const Ref<Resource> p_
 	}
 
 	if (res_name.is_empty()) {
-		p_item->set_text(0, _get_resource_type(p_resource));
+		p_item->set_text(0, _get_display_type_name(_get_resource_type(p_resource)));
 	} else {
-		p_item->set_text(0, vformat("%s (%s)", _get_resource_type(p_resource), res_name));
+		p_item->set_text(0, vformat("%s (%s)", _get_display_type_name(_get_resource_type(p_resource)), res_name));
 	}
 
 	p_item->set_icon(0, EditorNode::get_singleton()->get_object_icon(p_resource.ptr()));

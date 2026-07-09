@@ -1948,7 +1948,7 @@ void EditorInspectorCategory::set_property_info(const PropertyInfo &p_info) {
 
 	Ref<Script> scr = _get_category_script(info);
 	if (scr.is_valid()) {
-		StringName script_name = EditorNode::get_editor_data().script_class_get_name(scr->get_path());
+		StringName script_name = EditorNode::get_singleton()->get_object_custom_type_display_name(scr.ptr());
 		if (script_name != StringName()) {
 			label = script_name;
 		}

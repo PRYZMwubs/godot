@@ -2834,6 +2834,61 @@ String GDScriptLanguage::get_global_class_name(const String &p_path, String *r_b
 	return _get_global_class_name(p_path, r_base_type, r_icon_path, r_is_abstract, r_is_tool, r_vec);
 }
 
+static StringName _resolve_global_class_base_name_from_parser(const GDScriptParser &p_parser, const StringName &p_class_name) {
+	if (p_class_name == StringName()) {
+		return StringName();
+	}
+
+	if (ScriptServer::is_global_class(p_class_name)) {
+		return p_class_name;
+	}
+
+	const GDScriptParser::ClassNode *head = p_parser.get_tree();
+	if (head == nullptr) {
+		return StringName();
+	}
+
+	const String class_name = p_class_name;
+	if (class_name.contains(".")) {
+		return StringName();
+	}
+
+	String namespace_path = head->namespace_path;
+	while (!namespace_path.is_empty()) {
+		const String namespaced_name = namespace_path + "." + class_name;
+		if (ScriptServer::is_global_class(namespaced_name)) {
+			return namespaced_name;
+		}
+
+		const int dot = namespace_path.rfind(".");
+		if (dot == -1) {
+			break;
+		}
+		namespace_path = namespace_path.substr(0, dot);
+	}
+
+	for (const GDScriptParser::ImportNode &import_node : p_parser.get_imports()) {
+		if (import_node.name.is_empty()) {
+			continue;
+		}
+
+		String import_path;
+		for (int i = 0; i < import_node.name.size(); i++) {
+			if (i > 0) {
+				import_path += ".";
+			}
+			import_path += String(import_node.name[i]->name);
+		}
+
+		const String imported_name = import_path + "." + class_name;
+		if (ScriptServer::is_global_class(imported_name)) {
+			return imported_name;
+		}
+	}
+
+	return StringName();
+}
+
 String GDScriptLanguage::_get_global_class_name(const String &p_path, String *r_base_type, String *r_icon_path, bool *r_is_abstract, bool *r_is_tool, LocalVector<String> &r_visited) const {
 	if (r_visited.has(p_path)) {
 		return String();
@@ -2928,7 +2983,8 @@ String GDScriptLanguage::_get_global_class_name(const String &p_path, String *r_
 						}
 					}
 				} else if (subclass->extends.size() == 1) {
-					*r_base_type = subclass->extends[0]->name;
+					const StringName resolved_base = _resolve_global_class_base_name_from_parser(parser, subclass->extends[0]->name);
+					*r_base_type = resolved_base.is_empty() ? String(subclass->extends[0]->name) : String(resolved_base);
 					subclass = nullptr;
 				} else {
 					break;

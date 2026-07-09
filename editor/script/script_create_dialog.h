@@ -87,6 +87,7 @@ class ScriptCreateDialog : public ConfirmationDialog {
 	ScriptLanguage *language = nullptr;
 
 	String base_type;
+	String parent_name_raw;
 
 	void _path_hbox_sorted();
 	bool _can_be_built_in();

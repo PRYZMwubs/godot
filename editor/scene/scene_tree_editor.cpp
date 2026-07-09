@@ -687,7 +687,7 @@ void SceneTreeEditor::_update_node_tooltip(Node *p_node, TreeItem *p_item) {
 		tooltip += String("\n" + TTR("Instance:") + " " + p_node->get_scene_file_path());
 	}
 
-	StringName custom_type = EditorNode::get_singleton()->get_object_custom_type_name(p_node);
+	StringName custom_type = EditorNode::get_singleton()->get_object_custom_type_display_name(p_node);
 	tooltip += "\n" + TTR("Type:") + " " + (custom_type != StringName() ? String(custom_type) : p_node->get_class());
 
 	if (!p_node->get_editor_description().is_empty()) {

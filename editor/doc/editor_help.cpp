@@ -4695,7 +4695,7 @@ void EditorHelpBit::parse_symbol(const String &p_symbol, const String &p_prologu
 	if (item_type == "class") {
 		symbol_doc_link = vformat("#%s", class_name);
 		symbol_type = TTR("Class");
-		symbol_name = class_name;
+		symbol_name = item_name.is_empty() ? class_name : item_name;
 		symbol_hint = SYMBOL_HINT_INHERITANCE;
 		help_data = _get_class_help_data(class_name);
 	} else if (item_type == "enum") {

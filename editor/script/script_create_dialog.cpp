@@ -49,6 +49,18 @@
 #include "scene/gui/line_edit.h"
 #include "scene/theme/theme_db.h"
 
+static String _get_display_type_name(const String &p_type_name) {
+	const int dot = p_type_name.rfind(".");
+	return dot == -1 ? p_type_name : p_type_name.substr(dot + 1);
+}
+
+static String _get_parent_display_name(const String &p_parent_name) {
+	if (p_parent_name.is_quoted()) {
+		return p_parent_name;
+	}
+	return ScriptServer::is_global_class(p_parent_name) ? _get_display_type_name(p_parent_name) : p_parent_name;
+}
+
 static String _get_parent_class_of_script(const String &p_path) {
 	if (!ResourceLoader::exists(p_path, "Script")) {
 		return "Object"; // A script eventually inherits from Object.
@@ -196,7 +208,8 @@ String ScriptCreateDialog::_adjust_file_path(const String &p_base_path) const {
 }
 
 void ScriptCreateDialog::config(const String &p_base_name, const String &p_base_path, bool p_built_in_enabled, bool p_load_enabled) {
-	parent_name->set_text(p_base_name);
+	parent_name_raw = p_base_name;
+	parent_name->set_text(_get_parent_display_name(parent_name_raw));
 	parent_name->deselect();
 	built_in_name->set_text("");
 
@@ -312,28 +325,29 @@ String ScriptCreateDialog::_validate_path(const String &p_path, bool p_file_must
 }
 
 void ScriptCreateDialog::_parent_name_changed(const String &p_parent) {
-	is_parent_name_valid = _validate_parent(parent_name->get_text());
+	parent_name_raw = p_parent;
+	is_parent_name_valid = _validate_parent(parent_name_raw);
 	validation_panel->update();
 }
 
 void ScriptCreateDialog::_template_changed(int p_template) {
 	const ScriptLanguage::ScriptTemplate &sinfo = _get_current_template();
 	// Update last used dictionaries
-	if (is_using_templates && !parent_name->get_text().begins_with("\"res:")) {
+	if (is_using_templates && !parent_name_raw.begins_with("\"res:")) {
 		if (sinfo.origin == ScriptLanguage::TemplateLocation::TEMPLATE_PROJECT) {
 			// Save the last used template for this node into the project dictionary.
 			Dictionary dic_templates_project = EditorSettings::get_singleton()->get_project_metadata("script_setup", "templates_dictionary", Dictionary());
-			dic_templates_project[parent_name->get_text()] = sinfo.get_hash();
+			dic_templates_project[parent_name_raw] = sinfo.get_hash();
 			EditorSettings::get_singleton()->set_project_metadata("script_setup", "templates_dictionary", dic_templates_project);
 		} else {
 			// Save template info to editor dictionary (not a project template).
 			Dictionary dic_templates = EDITOR_GET("_script_setup_templates_dictionary");
-			dic_templates[parent_name->get_text()] = sinfo.get_hash();
+			dic_templates[parent_name_raw] = sinfo.get_hash();
 			EditorSettings::get_singleton()->set("_script_setup_templates_dictionary", dic_templates);
 			// Remove template from project dictionary as we last used an editor level template.
 			Dictionary dic_templates_project = EditorSettings::get_singleton()->get_project_metadata("script_setup", "templates_dictionary", Dictionary());
-			if (dic_templates_project.has(parent_name->get_text())) {
-				dic_templates_project.erase(parent_name->get_text());
+			if (dic_templates_project.has(parent_name_raw)) {
+				dic_templates_project.erase(parent_name_raw);
 				EditorSettings::get_singleton()->set_project_metadata("script_setup", "templates_dictionary", dic_templates_project);
 			}
 		}
@@ -370,8 +384,8 @@ void ScriptCreateDialog::_create_new() {
 
 	const ScriptLanguage::ScriptTemplate sinfo = _get_current_template();
 
-	String parent_class = parent_name->get_text();
-	if (!parent_name->get_text().is_quoted() && !ClassDB::class_exists(parent_class) && !ScriptServer::is_global_class(parent_class)) {
+	String parent_class = parent_name_raw;
+	if (!parent_name_raw.is_quoted() && !ClassDB::class_exists(parent_class) && !ScriptServer::is_global_class(parent_class)) {
 		// If base is a custom type, replace with script path instead.
 		const EditorData::CustomType *type = EditorNode::get_editor_data().get_custom_type_by_name(parent_class);
 		ERR_FAIL_NULL(type);
@@ -432,7 +446,7 @@ void ScriptCreateDialog::_language_changed(int l) {
 
 	EditorSettings::get_singleton()->set_project_metadata("script_setup", "last_selected_language", language_menu->get_item_text(language_menu->get_selected()));
 
-	_parent_name_changed(parent_name->get_text());
+	_parent_name_changed(parent_name_raw);
 	validation_panel->update();
 }
 
@@ -483,8 +497,9 @@ void ScriptCreateDialog::_browse_path(bool browse_parent, bool p_save) {
 void ScriptCreateDialog::_file_selected(const String &p_file) {
 	String path = ProjectSettings::get_singleton()->localize_path(p_file);
 	if (is_browsing_parent) {
-		parent_name->set_text("\"" + path + "\"");
-		_parent_name_changed(parent_name->get_text());
+		parent_name_raw = "\"" + path + "\"";
+		parent_name->set_text(parent_name_raw);
+		_parent_name_changed(parent_name_raw);
 	} else {
 		file_path->set_text(path);
 		_path_changed(path);
@@ -498,8 +513,9 @@ void ScriptCreateDialog::_file_selected(const String &p_file) {
 }
 
 void ScriptCreateDialog::_create() {
-	parent_name->set_text(select_class->get_selected_type_name());
-	_parent_name_changed(parent_name->get_text());
+	parent_name_raw = select_class->get_selected_type_name();
+	parent_name->set_text(_get_parent_display_name(parent_name_raw));
+	_parent_name_changed(parent_name_raw);
 }
 
 void ScriptCreateDialog::_browse_class_in_tree() {
@@ -544,7 +560,7 @@ void ScriptCreateDialog::_update_template_menu() {
 		// Get the latest templates used for each type of node from project settings then global settings.
 		Dictionary last_local_templates = EditorSettings::get_singleton()->get_project_metadata("script_setup", "templates_dictionary", Dictionary());
 		Dictionary last_global_templates = EDITOR_GET("_script_setup_templates_dictionary");
-		String inherits_base_type = parent_name->get_text();
+		String inherits_base_type = parent_name_raw;
 
 		// If it inherits from a script, get its parent class first.
 		if (inherits_base_type[0] == '"') {
@@ -597,9 +613,9 @@ void ScriptCreateDialog::_update_template_menu() {
 							preselected_template = id;
 						}
 						// Check for last used template for this node in project settings then in global settings.
-						if (last_local_templates.has(parent_name->get_text()) && t.get_hash() == String(last_local_templates[parent_name->get_text()])) {
+						if (last_local_templates.has(parent_name_raw) && t.get_hash() == String(last_local_templates[parent_name_raw])) {
 							last_used_template = id;
-						} else if (last_used_template == -1 && last_global_templates.has(parent_name->get_text()) && t.get_hash() == String(last_global_templates[parent_name->get_text()])) {
+						} else if (last_used_template == -1 && last_global_templates.has(parent_name_raw) && t.get_hash() == String(last_global_templates[parent_name_raw])) {
 							last_used_template = id;
 						}
 						t.id = id;
@@ -667,7 +683,7 @@ void ScriptCreateDialog::_update_dialog() {
 
 	if (is_built_in) {
 		validation_panel->set_message(MSG_ID_BUILT_IN, TTRC("Note: Built-in scripts have some limitations and can't be edited using an external editor."), EditorValidationPanel::MSG_INFO, false);
-	} else if (file_path->get_text().get_file().get_basename() == parent_name->get_text()) {
+	} else if (file_path->get_text().get_file().get_basename() == _get_parent_display_name(parent_name_raw)) {
 		validation_panel->set_message(MSG_ID_BUILT_IN, TTRC("Warning: Having the script name be the same as a built-in type is usually not desired."), EditorValidationPanel::MSG_WARNING, false);
 	}
 

@@ -5733,6 +5733,17 @@ StringName EditorNode::get_object_custom_type_name(const Object *p_object) const
 	return StringName();
 }
 
+StringName EditorNode::get_object_custom_type_display_name(const Object *p_object) const {
+	const StringName custom_type = get_object_custom_type_name(p_object);
+	if (custom_type == StringName()) {
+		return custom_type;
+	}
+
+	const String custom_type_name = custom_type;
+	const int dot = custom_type_name.rfind(".");
+	return dot == -1 ? custom_type : StringName(custom_type_name.substr(dot + 1));
+}
+
 void EditorNode::_pick_main_scene_custom_action(const String &p_custom_action_name) {
 	if (p_custom_action_name == "select_current") {
 		Node *scene = editor_data.get_edited_scene_root();

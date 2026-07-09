@@ -101,9 +101,18 @@ StringName GDScriptAnalyzer::resolve_global_class_name(const StringName &p_class
 	}
 
 	if (!parser->head->namespace_path.is_empty()) {
-		const String namespaced_name = parser->head->namespace_path + "." + class_name;
-		if (ScriptServer::is_global_class(namespaced_name)) {
-			return namespaced_name;
+		String namespace_path = parser->head->namespace_path;
+		while (!namespace_path.is_empty()) {
+			const String namespaced_name = namespace_path + "." + class_name;
+			if (ScriptServer::is_global_class(namespaced_name)) {
+				return namespaced_name;
+			}
+
+			const int dot = namespace_path.rfind(".");
+			if (dot == -1) {
+				break;
+			}
+			namespace_path = namespace_path.substr(0, dot);
 		}
 	}
 
